@@ -1,4 +1,11 @@
 /*
+ * Copyright (C) 2026 Slate. All Rights Reserved.
+ * * PROPRIETARY AND CONFIDENTIAL.
+ * This software is the sole property of Slate. Unauthorized copying, 
+ * distribution, or use of this file is strictly prohibited.
+ */
+
+/*
  * Copyright (C) 2012 ARM Ltd.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -776,6 +783,7 @@ extern pgd_t tramp_pg_dir[PTRS_PER_PGD];
 
 extern int kern_addr_valid(unsigned long addr);
 
+#define arch_has_hw_pte_young	cpu_has_hw_af
 
 void pgd_cache_init(void);
 #define pgtable_cache_init	pgd_cache_init
