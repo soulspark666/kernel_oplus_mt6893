@@ -311,7 +311,15 @@ struct mem_cgroup {
 	struct list_head event_list;
 	spinlock_t event_list_lock;
 
+<<<<<<< HEAD
 	u64 android_oem_data1;
+=======
+#ifdef CONFIG_LRU_GEN
+	/* per-memcg mm_struct list */
+	struct lru_gen_mm_list mm_list;
+#endif
+
+>>>>>>> cb7e73b77cef (FROMLIST: mm: multi-gen LRU: Support page table walks)
 	struct mem_cgroup_per_node *nodeinfo[0];
 	/* WARNING: nodeinfo must be the last member here */
 };
