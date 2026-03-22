@@ -33,9 +33,14 @@ jobs:
           config: mt6893_defconfig
           arch: arm64
 
-          aosp-gcc: true
-          aosp-clang: true
-          aosp-clang-version: r547379
+          aosp-gcc: false
+          aosp-clang: false
+          # aosp-clang-version: r547379
+          other-clang-url: https://gitlab.com/LeCmnGend/clang.git
+          other-clang-branch: clang-17
+          other-gcc32-url: https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9
+          other-gcc32-branch: android12L-release
+          other-gcc64-url: https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9
 
           ksu: false
           ksu-other: false
@@ -45,7 +50,7 @@ jobs:
           anykernel3: true
           anykernel3-url: https://github.com/nishant6342/AnyKernel3
 
-          access-token: ${{ secrets.GH_TOKEN }}
+          access-token: ${{ secrets.GITHUB_TOKEN }}
           release: true
 
           extra-make-args: '[
