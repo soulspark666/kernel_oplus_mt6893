@@ -923,6 +923,8 @@ static int show_smaps_rollup(struct seq_file *m, void *v)
 	hold_task_mempolicy(priv);
 
 	for (vma = priv->mm->mmap; vma;) {
+		if (!vma->vm_mm)
+			goto next_vma;
 		smap_gather_stats(vma, &mss);
 		last_vma_end = vma->vm_end;
 
@@ -978,6 +980,7 @@ static int show_smaps_rollup(struct seq_file *m, void *v)
 				continue;
 		}
 		/* Case 2 above */
+	next_vma:
 		vma = vma->vm_next;
 	}
 
