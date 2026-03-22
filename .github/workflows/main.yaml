@@ -28,7 +28,7 @@ jobs:
         LLVM_IAS: 1
       with:
           kernel-url: https://github.com/soulspark666/kernel_oplus_mt6893
-          kernel-branch: pipeline
+          kernel-branch: lineage-23.2
           ccache: true
           config: mt6893_defconfig
           arch: arm64
