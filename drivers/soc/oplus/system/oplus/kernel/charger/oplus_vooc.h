@@ -389,6 +389,8 @@ struct oplus_vooc_chip {
 	int bcc_soc_range;
 	int bcc_temp_range;
 	int bcc_curr_count;
+
+	int fast_present_retry;
 };
 
 struct oplus_vooc_cp {

@@ -208,6 +208,7 @@ static void oplus_vooc_watchdog(struct timer_list *unused)
 	chip->fastchg_low_temp_full = false;
 	chip->btb_temp_over = false;
 	chip->fast_chg_type = FASTCHG_CHARGER_TYPE_UNKOWN;
+	chip->fast_present_retry = 0;
 	charger_abnormal_log = CRITICAL_LOG_VOOC_WATCHDOG;
 	schedule_work(&chip->vooc_watchdog_work);
 }
@@ -1222,6 +1223,67 @@ static int oplus_get_allowed_current_max(bool fw_7bit)
 	return cur_max_val;
 }
 #endif
+
+#define VOOC_FAST_PRESENT_RETRY_MAX	3
+
+/*
+ * vooc_should_reset_handshake - decide whether the FAST_PRESENT event
+ * requires a full state machine reset.
+ *
+ * During the VOOC handshake the MCU sends FAST_PRESENT to the AP.
+ * The entry block of oplus_vooc_fastchg_func() sets fastchg_started or
+ * fastchg_dummy_started before reaching this post-processing path,
+ * so under normal conditions this function returns false.
+ *
+ * A reset is only warranted when the driver has no active fast-charge
+ * session AND the MCU reset GPIO is asserted, indicating a genuine
+ * error condition.  In all other cases the handshake should be allowed
+ * to continue:
+ *
+ *   - fastchg_started / fastchg_dummy_started: session in progress
+ *   - fastchg_ing: mid-charge data transfer active
+ *   - fastchg_to_normal / fastchg_to_warm / fastchg_to_warm_full:
+ *     transitioning out of fast charge
+ *   - reset GPIO not active: MCU may be slow to deassert; resetting
+ *     here would cause an infinite handshake loop
+ *
+ * As a last-resort safety net, a retry counter tracks consecutive
+ * FAST_PRESENT events that reach this path without a session being
+ * established.  If the count exceeds VOOC_FAST_PRESENT_RETRY_MAX the
+ * reset is forced regardless of GPIO state, to recover from faulty
+ * charger negotiation.
+ */
+static bool vooc_should_reset_handshake(struct oplus_vooc_chip *chip)
+{
+	/* Active or transitional session — handshake is valid. */
+	if (chip->fastchg_started || chip->fastchg_dummy_started)
+		return false;
+	if (chip->fastchg_ing || chip->fastchg_to_normal ||
+	    chip->fastchg_to_warm || chip->fastchg_to_warm_full)
+		return false;
+
+	/*
+	 * No session is active.  Only reset if the MCU reset GPIO
+	 * confirms the MCU is actually being held in reset, or if
+	 * we have exhausted the retry budget.
+	 */
+	chip->fast_present_retry++;
+
+	if (chip->fast_present_retry > VOOC_FAST_PRESENT_RETRY_MAX) {
+		chg_debug("FAST_PRESENT: retry count %d exceeded, forcing reset\n",
+			chip->fast_present_retry);
+		chip->fast_present_retry = 0;
+		return true;
+	}
+
+	if (oplus_vooc_get_reset_active_status() != 1)
+		return false;
+
+	chg_debug("FAST_PRESENT: no active session, reset GPIO asserted, resetting handshake\n");
+	chip->fast_present_retry = 0;
+	return true;
+}
+
 static void oplus_vooc_fastchg_func(struct work_struct *work)
 {
 	struct delayed_work *dwork = to_delayed_work(work);
@@ -1364,6 +1426,7 @@ static void oplus_vooc_fastchg_func(struct work_struct *work)
 		chip->fastchg_batt_temp_status = BAT_TEMP_NATURAL;
 		chip->vooc_temp_cur_range = FASTCHG_TEMP_RANGE_INIT;
 		chip->fastchg_to_warm_full = false;
+		chip->fast_present_retry = 0;
 		if (chip->adapter_update_real == ADAPTER_FW_UPDATE_FAIL) {
 			chip->adapter_update_real = ADAPTER_FW_UPDATE_NONE;
 			chip->adapter_update_report = chip->adapter_update_real;
@@ -2000,8 +2063,15 @@ out:
 			|| (data == VOOC_NOTIFY_ALLOW_READING_IIC)
 			|| (data == VOOC_NOTIFY_BTB_TEMP_OVER)) {
 		oplus_vooc_battery_update();
-		if (oplus_vooc_get_reset_active_status() != 1
-			&& data == VOOC_NOTIFY_FAST_PRESENT) {
+		if (data == VOOC_NOTIFY_FAST_PRESENT &&
+		    vooc_should_reset_handshake(chip)) {
+			/*
+			 * No active fast-charge session and the reset GPIO
+			 * confirms the MCU is held in reset — this is a
+			 * genuine inconsistency.  Tear down and revert to
+			 * normal charging so the next plug event starts
+			 * cleanly.
+			 */
 			chip->allow_reading = true;
 			chip->fastchg_started = false;
 			chip->fastchg_to_normal = false;
