@@ -1,0 +1,54 @@
+name: Build Kernel
+
+on:
+  push:
+    branches:
+      - pipeline
+  workflow_dispatch:
+
+jobs:
+  Build-Kernel:
+    strategy:
+      fail-fast: false
+    runs-on: ubuntu-22.04
+
+    permissions:
+      contents: write
+
+    steps:
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ccache lld
+
+    - name: Build Kernel
+      uses: dabao1955/kernel_build_action@main
+      env:
+        LLVM: 1
+        LLVM_IAS: 1
+      with:
+          kernel-url: https://github.com/soulspark666/kernel_oplus_mt6893
+          kernel-branch: pipeline
+          ccache: true
+          config: mt6893_defconfig
+          arch: arm64
+
+          aosp-gcc: true
+          aosp-clang: true
+          aosp-clang-version: r547379
+
+          ksu: false
+          ksu-other: false
+
+          disable-lto: true
+
+          anykernel3: true
+          anykernel3-url: https://github.com/nishant6342/AnyKernel3
+
+          access-token: ${{ secrets.GH_TOKEN }}
+          release: true
+
+          extra-make-args: '[
+            "CC=clang",
+            "CLANG_TRIPLE=aarch64-linux-gnu-"
+          ]'
