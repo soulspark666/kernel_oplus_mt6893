@@ -629,13 +629,71 @@ static const struct file_operations project_info_fops = {
     .release = single_release,
 };
 
+static int oplus_stub_show(struct seq_file *m, void *v)
+{
+    seq_printf(m, "0\n");
+    return 0;
+}
+
+static int oplus_stub_open(struct inode *inode, struct file *file)
+{
+    return single_open(file, oplus_stub_show, NULL);
+}
+
+static ssize_t oplus_stub_write(struct file *file, const char __user *buf,
+                               size_t count, loff_t *ppos)
+{
+    return count;
+}
+
+static const struct file_operations oplus_stub_fops = {
+    .owner = THIS_MODULE,
+    .open  = oplus_stub_open,
+    .read  = seq_read,
+    .write = oplus_stub_write,
+    .llseek = seq_lseek,
+    .release = single_release,
+};
+
 static int __init oplus_project_init(void)
 {
     struct proc_dir_entry *p_entry;
+    struct proc_dir_entry *afs_dir;
+    struct proc_dir_entry *adfr_dir;
 
     oplus_info = proc_mkdir("oplusVersion", NULL);
     if (!oplus_info) {
         goto error_init;
+    }
+
+    /* AFS Stub */
+    afs_dir = proc_mkdir("oplus_afs_config", NULL);
+    if (afs_dir) {
+        proc_create("afs_config", 0666, afs_dir, &oplus_stub_fops);
+    }
+
+    /* ADFR Stub */
+    adfr_dir = proc_mkdir("oplus_adfr", NULL);
+    if (adfr_dir) {
+        proc_create("adfr_config", 0666, adfr_dir, &oplus_stub_fops);
+    }
+
+    /* Charger Config Stub */
+    adfr_dir = proc_mkdir("oplus_chg_config", NULL);
+    if (adfr_dir) {
+        proc_create("get_chg_config", 0666, adfr_dir, &oplus_stub_fops);
+    }
+
+    /* Osense Stub */
+    adfr_dir = proc_mkdir("osense", NULL);
+    if (adfr_dir) {
+        proc_create("osense_res_manager", 0666, adfr_dir, &oplus_stub_fops);
+    }
+
+    /* Suspend Stub */
+    adfr_dir = proc_mkdir("oplus_suspend", NULL);
+    if (adfr_dir) {
+        proc_create("suspend_config", 0666, adfr_dir, &oplus_stub_fops);
     }
 
     p_entry = proc_create_data("prjName", S_IRUGO, oplus_info, &project_info_fops, UINT2Ptr(PROJECT_VERSION));

@@ -151,6 +151,30 @@ static ssize_t oplus_display_get_fp_state(struct  kobject *kobj,
     return sprintf(buf, "%d,%d,%d\n", fp_state[0], fp_state[1], fp_state[2]);
 }
 
+static ssize_t oplus_display_get_adfr(struct kobject *kobj,
+                struct kobj_attribute *attr, char *buf)
+{
+        return sprintf(buf, "0\n");
+}
+
+static ssize_t oplus_display_set_adfr(struct kobject *kobj,
+                struct kobj_attribute *attr, const char *buf, size_t count)
+{
+        return count;
+}
+
+static ssize_t oplus_display_get_dynamic_te(struct kobject *kobj,
+                struct kobj_attribute *attr, char *buf)
+{
+        return sprintf(buf, "0\n");
+}
+
+static ssize_t oplus_display_set_dynamic_te(struct kobject *kobj,
+                struct kobj_attribute *attr, const char *buf, size_t count)
+{
+        return count;
+}
+
 static ssize_t oplus_display_get_brightness(struct kobject *kobj,
                                 struct kobj_attribute *attr, char *buf)
 {
@@ -1532,6 +1556,8 @@ static ssize_t oplus_display_set_mipi_hopping(struct kobject *kobj,
 	return count;
 }
 static struct kobject *oplus_display_kobj;
+static struct kobj_attribute dev_attr_adfr = __ATTR(adfr, S_IRUGO|S_IWUSR, oplus_display_get_adfr, oplus_display_set_adfr);
+static struct kobj_attribute dev_attr_dynamic_te = __ATTR(dynamic_te, S_IRUGO|S_IWUSR, oplus_display_get_dynamic_te, oplus_display_set_dynamic_te);
 static struct kobj_attribute dev_attr_oplus_brightness = __ATTR(oplus_brightness, S_IRUGO|S_IWUSR, oplus_display_get_brightness, oplus_display_set_brightness);
 static struct kobj_attribute dev_attr_oplus_max_brightness = __ATTR(oplus_max_brightness, S_IRUGO|S_IWUSR, oplus_display_get_max_brightness, NULL);
 static struct kobj_attribute dev_attr_max_brightness = __ATTR(max_brightness, S_IRUGO|S_IWUSR, oplus_display_get_maxbrightness, NULL);
@@ -1570,7 +1596,9 @@ static struct kobj_attribute dev_attr_crc_check = __ATTR(crc_check, S_IRUGO|S_IW
  * at once.
  */
 static struct attribute *oplus_display_attrs[] = {
-	&dev_attr_oplus_brightness.attr,
+        &dev_attr_adfr.attr,
+        &dev_attr_dynamic_te.attr,
+        &dev_attr_oplus_brightness.attr,
 	&dev_attr_oplus_max_brightness.attr,
 	&dev_attr_max_brightness.attr,
 	&dev_attr_hbm.attr,
