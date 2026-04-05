@@ -13,7 +13,7 @@ obj-$(CONFIG_OPLUS_FEATURE_OPROJECT)	+= gki/oplus_project.o
 endif
 else
 ifeq ($(CONFIG_OPLUS_FEATURE_OPROJECT), y)
-obj-$(CONFIG_OPLUS_FEATURE_OPROJECT) 	+= mtk/oplus_project.o mtk/oplus_project_oldcdt.o
+obj-$(CONFIG_OPLUS_FEATURE_OPROJECT) 	+= mtk/oplus_project.o mtk/oplus_project_oldcdt.o mtk/oplus_coloros16_stubs.o
 else
 obj-$(CONFIG_OPLUS_FEATURE_OPROJECT) 	+= gki_mtk/oplus_project.o
 endif
