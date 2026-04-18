@@ -6,7 +6,7 @@ on:
       kernel_branch:
         description: "Kernel branch to build"
         required: true
-        default: "pipeline"
+        default: "susfs"
       kernel_config:
         description: "Kernel config to build"
         required: false
@@ -22,6 +22,12 @@ jobs:
       contents: write
 
     steps:
+      - name: Checkout current repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.kernel_branch }}
+          submodules: recursive
+
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -33,7 +39,7 @@ jobs:
           LLVM: 1
           LLVM_IAS: 1
         with:
-          kernel-url: https://github.com/soulspark666/kernel_oplus_mt6893
+          kernel-url: ./
           kernel-branch: ${{ github.event.inputs.kernel_branch }}
           ccache: true
           config: ${{ github.event.inputs.kernel_config || 'mt6893_defconfig' }}
