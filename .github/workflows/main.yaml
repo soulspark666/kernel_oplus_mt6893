@@ -45,13 +45,14 @@ jobs:
           ccache: true
           config: ${{ github.event.inputs.kernel_config || 'mt6893_defconfig' }}
           arch: arm64
-          aosp-gcc: true
+          aosp-gcc: false
           aosp-clang: false
           other-clang-url: https://github.com/kdrag0n/proton-clang.git
           other-clang-branch: master
-          other-gcc32-url: https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9
-          other-gcc32-branch: android12L-release
-          other-gcc64-url: https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9
+          other-gcc32-url: https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9
+          other-gcc32-branch: lineage-19.1
+          other-gcc64-url: https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9
+          other-gcc64-branch: lineage-19.1
           ksu: false
           ksu-other: false
           disable-lto: true
