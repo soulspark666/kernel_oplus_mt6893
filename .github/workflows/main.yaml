@@ -1,0 +1,58 @@
+name: Build Kernel
+
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_branch:
+        description: "Kernel branch to build"
+        required: true
+        default: "pipeline"
+      kernel_config:
+        description: "Kernel config to build"
+        required: false
+        default: "mt6893_defconfig"
+
+jobs:
+  Build-Kernel:
+    strategy:
+      fail-fast: false
+    runs-on: ubuntu-22.04
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ccache lld
+
+      - name: Build Kernel
+        uses: dabao1955/kernel_build_action@main
+        env:
+          LLVM: 1
+          LLVM_IAS: 1
+        with:
+          kernel-url: https://github.com/soulspark666/kernel_oplus_mt6893
+          kernel-branch: ${{ github.event.inputs.kernel_branch }}
+          ccache: true
+          config: ${{ github.event.inputs.kernel_config || 'mt6893_defconfig' }}
+          arch: arm64
+          aosp-gcc: true
+          aosp-clang: false
+          other-clang-url: https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/ba7da711271d310dda6b5134d8f4448f6a276a27/clang-r498229b.tar.gz
+          other-gcc32-url: https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9
+          other-gcc32-branch: android12L-release
+          other-gcc64-url: https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9
+          ksu: false
+          ksu-other: false
+          disable-lto: true
+          anykernel3: true
+          anykernel3-url: https://github.com/liwhy1/AnyKernel3
+          access-token: ${{ secrets.GITHUB_TOKEN }}
+          release: true
+          extra-make-args: '[ 
+            "CC=clang",
+            "CONFIG_NO_ERROR_ON_MISMATCH=y",
+            "CLANG_TRIPLE=aarch64-linux-gnu-"
+          ]'
