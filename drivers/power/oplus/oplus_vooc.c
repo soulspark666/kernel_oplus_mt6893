@@ -140,9 +140,7 @@ int oplus_vooc_get_adaptive_current_limit(struct oplus_vooc_chip *chip)
 	}
 
 	/* Get battery cycle count from gauge */
-	if (oplus_gauge_get_batt_cycle_count) {
-		batt_cycle = oplus_gauge_get_batt_cycle_count();
-	}
+	batt_cycle = oplus_gauge_get_batt_cc();
 
 	/* Reduce current for aged batteries (>500 cycles) */
 	if (batt_cycle > 500) {

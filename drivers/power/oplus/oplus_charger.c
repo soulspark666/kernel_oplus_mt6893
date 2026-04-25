@@ -655,9 +655,8 @@ static bool oplus_midas_passedchg_reset(int prev, int val)
 
 static int oplus_chg_voocphy_get_cp_ibus(void)
 {
-	int cp_current = 0;
-
 	struct oplus_chg_chip *chip = NULL;
+	int cp_current = 0;
 
 	if (oplus_chg_get_voocphy_support() == AP_SINGLE_CP_VOOCPHY
 		|| oplus_chg_get_voocphy_support() == AP_DUAL_CP_VOOCPHY) {
@@ -676,9 +675,8 @@ static int oplus_chg_voocphy_get_cp_ibus(void)
 
 static int oplus_chg_voocphy_get_slave_cp_ibus(void)
 {
-	int slave_cp_current = 0;
-
 	struct oplus_chg_chip *chip = NULL;
+	int slave_cp_current = 0;
 
 	if (oplus_chg_get_voocphy_support() == AP_SINGLE_CP_VOOCPHY
 		|| oplus_chg_get_voocphy_support() == AP_DUAL_CP_VOOCPHY) {
@@ -698,9 +696,11 @@ static int oplus_chg_voocphy_get_slave_cp_ibus(void)
 #define DEVIATION_NUM 30
 static int oplus_chg_voocphy_get_cp_vbat_deviation(void)
 {
-	int cp_vbat, gauge_bat, vbat_deviation;
-	u8 cp_adc_reg;
-	int retry = 5;
+    struct oplus_chg_chip *chip = NULL;
+    int cp_vbat, gauge_bat, vbat_deviation;
+    u8 cp_adc_reg;
+    int retry = 5;
+	
 
 	if (oplus_chg_get_voocphy_support() == NO_VOOCPHY) {
 		return 0;
@@ -725,8 +725,6 @@ static int oplus_chg_voocphy_get_cp_vbat_deviation(void)
 			break;
 		}
 	}
-
-	struct oplus_chg_chip *chip = NULL;
 
 	mutex_lock(&g_charger_chip_mutex);
 	chip = g_charger_chip;
@@ -824,7 +822,7 @@ int oplus_battery_get_property(struct power_supply *psy,
 		union power_supply_propval *val)
 {
 	int ret = 0;
-	//struct oplus_chg_chip *chip = container_of(psy->desc, struct oplus_chg_chip, battery_psd);
+	/*struct oplus_chg_chip *chip = container_of(psy->desc, struct oplus_chg_chip, battery_psd);*/
 	struct oplus_chg_chip *chip = g_charger_chip;
 	union oplus_chg_mod_propval temp_val = {0, };
 	int batt_health = POWER_SUPPLY_HEALTH_UNKNOWN;
@@ -934,26 +932,19 @@ int oplus_battery_get_property(struct power_supply *psy,
 			}
 			break;
 		case POWER_SUPPLY_PROP_CHARGE_NOW:
-			if (oplus_vooc_get_fastchg_started() == true && (chip->vbatt_num == 2 || is_vooc_support_single_batt_svooc() == true)
-			&& oplus_vooc_get_fast_chg_type() != CHARGER_SUBTYPE_FASTCHG_VOOC) {
-				val->intval = 10000;
-			struct oplus_chg_chip *chip = NULL;
-			
 			mutex_lock(&g_charger_chip_mutex);
 			chip = g_charger_chip;
-			if (chip && oplus_vooc_get_fastchg_started() == true && (!chip->external_gauge && !oplus_voocphy_chip_is_null())
-				&& oplus_vooc_get_fast_chg_type() != CHARGER_SUBTYPE_FASTCHG_VOOC) {
-					val->intval = 10000;
-				} else {
-			mutex_unlock(&g_charger_chip_mutex);
-				val->intval = 0;
-			}
+			if (chip && oplus_vooc_get_fastchg_started() == true && (chip->vbatt_num == 2 || is_vooc_support_single_batt_svooc() == true)
+			&& oplus_vooc_get_fast_chg_type() != CHARGER_SUBTYPE_FASTCHG_VOOC) {
+				val->intval = 10000;
+			} else {
 				if (oplus_chg_get_voocphy_support() == NO_VOOCPHY) {
-					val->intval = chip->charger_volt;
+					val->intval = (chip ? chip->charger_volt : 0);
 				} else {
 					val->intval = oplus_chg_get_charger_voltage();
 				}
 			}
+			mutex_unlock(&g_charger_chip_mutex);
 			if (oplus_is_power_off_charging(NULL) &&
 			    (oplus_chg_get_curr_time_ms(&cur_chg_time) < FORCE_VBUS_5V_TIME))
 				val->intval = KPOC_FORCE_VBUS_MV;
@@ -1042,9 +1033,11 @@ static int init_proc_batt_param_noplug(void)
 }
 
 static ssize_t proc_tbatt_pwroff_write(struct file *filp,
-		const char __user *buf, size_t len, loff_t *data)
+        const char __user *buf, size_t len, loff_t *data)
 {
-	char buffer[2] = {0};
+    struct oplus_chg_chip *chip = NULL;
+    char buffer[2] = {0};
+	
 
 	if (len > 2) {
 		return -EFAULT;
@@ -1059,7 +1052,6 @@ static ssize_t proc_tbatt_pwroff_write(struct file *filp,
 		tbatt_pwroff_enable = 1;
 		oplus_tbatt_power_off_task_wakeup();
 	} else if (buffer[0] == '2') {
-		struct oplus_chg_chip *chip = NULL;
 	mutex_lock(&g_charger_chip_mutex);
 	chip = g_charger_chip;
 	if (chip) {
@@ -1067,7 +1059,6 @@ static ssize_t proc_tbatt_pwroff_write(struct file *filp,
 	}
 	mutex_unlock(&g_charger_chip_mutex);
 	} else if (buffer[0] == '3') {
-		struct oplus_chg_chip *chip = NULL;
 	mutex_lock(&g_charger_chip_mutex);
 	chip = g_charger_chip;
 	if (chip) {
@@ -1075,16 +1066,14 @@ static ssize_t proc_tbatt_pwroff_write(struct file *filp,
 	}
 	mutex_unlock(&g_charger_chip_mutex);
 	}
-	struct oplus_chg_chip *chip = NULL;
-	mutex_lock(&g_charger_chip_mutex);
-	chip = g_charger_chip;
-	if (chip) {
-		chg_err("%s:tbatt_pwroff_enable = %d. flash_screen_ctrl_status=%d\n", __func__,
-			tbatt_pwroff_enable, chip->flash_screen_ctrl_status);
-	} else {
-		chg_err("%s:tbatt_pwroff_enable = %d. flash_screen_ctrl_status=<null>\n", __func__,
-			tbatt_pwroff_enable);
-	}
+    mutex_lock(&g_charger_chip_mutex);
+    if (chip) {
+        chg_err("%s:tbatt_pwroff_enable = %d. flash_screen_ctrl_status=%d\n", __func__,
+            tbatt_pwroff_enable, chip->flash_screen_ctrl_status);
+    } else {
+        chg_err("%s:tbatt_pwroff_enable = %d. flash_screen_ctrl_status=<null>\n", __func__,
+            tbatt_pwroff_enable);
+    }
 	mutex_unlock(&g_charger_chip_mutex);
 	return len;
 }
@@ -1221,7 +1210,9 @@ static void oplus_chg_set_awake(struct oplus_chg_chip *chip, bool awake);
 static ssize_t chg_cycle_write(struct file *file,
 		const char __user *buff, size_t count, loff_t *ppos)
 {
+	struct oplus_chg_chip *chip = NULL;
 	char proc_chg_cycle_data[16];
+	
 
 	if(count >= 16) {
 		count = 16;
@@ -1231,7 +1222,6 @@ static ssize_t chg_cycle_write(struct file *file,
 		return -EFAULT;
 	}
 	if (strncmp(proc_chg_cycle_data, "en808", 5) == 0) {
-		struct oplus_chg_chip *chip = NULL;
 		mutex_lock(&g_charger_chip_mutex);
 		chip = g_charger_chip;
 		if (chip && chip->unwakelock_chg == 1) {
@@ -1244,7 +1234,6 @@ static ssize_t chg_cycle_write(struct file *file,
 		if (oplus_voocphy_get_bidirect_cp_support()) {
 			oplus_voocphy_set_chg_auto_mode(false);
 		}
-		struct oplus_chg_chip *chip = NULL;
 		mutex_lock(&g_charger_chip_mutex);
 		chip = g_charger_chip;
 		if (chip) {
@@ -1280,7 +1269,6 @@ static ssize_t chg_cycle_write(struct file *file,
 		charger_xlog_printk(CHG_LOG_CRTI, "wake up update_work\n");
 	} else if (strncmp(proc_chg_cycle_data, "dis808", 6) == 0) {
 		{
-			struct oplus_chg_chip *chip = NULL;
 			mutex_lock(&g_charger_chip_mutex);
 			chip = g_charger_chip;
 			if (chip && chip->unwakelock_chg == 1) {
