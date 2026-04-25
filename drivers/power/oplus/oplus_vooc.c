@@ -129,6 +129,33 @@ void oplus_vooc_battery_update(void)
 	}
 }
 
+/* Adaptive current limit based on battery health (cycle count) */
+int oplus_vooc_get_adaptive_current_limit(struct oplus_vooc_chip *chip)
+{
+	int batt_cycle = 0;
+	int current_limit = chip->vooc_strategy_normal_current;
+
+	if (!chip || !chip->batt_psy) {
+		return current_limit;
+	}
+
+	/* Get battery cycle count from gauge */
+	if (oplus_gauge_get_batt_cycle_count) {
+		batt_cycle = oplus_gauge_get_batt_cycle_count();
+	}
+
+	/* Reduce current for aged batteries (>500 cycles) */
+	if (batt_cycle > 500) {
+		int reduction = (batt_cycle - 500) / 100;
+		reduction = min(reduction, 5); /* Max 50% reduction */
+		current_limit = (chip->vooc_strategy_normal_current * (10 - reduction)) / 10;
+		current_limit = max(current_limit, chip->vooc_strategy_normal_current / 2);
+	}
+
+	return current_limit;
+}
+EXPORT_SYMBOL_GPL(oplus_vooc_get_adaptive_current_limit);
+
 void oplus_vooc_switch_mode(int mode)
 {
 	if (oplus_chg_get_voocphy_support() == AP_SINGLE_CP_VOOCPHY
@@ -471,6 +498,22 @@ static void oplus_vooc_check_charger_out(struct oplus_vooc_chip *chip)
 int multistepCurrent[] = {1500, 2000, 3000, 4000, 5000, 6000};
 
 #define VOOC_TEMP_OVER_COUNTS	2
+#define VOOC_CUPIDA_THERMAL_DERATE_START	420  /* 42.0°C */
+#define VOOC_CUPIDA_THERMAL_DERATE_END	500  /* 50.0°C */
+
+/* Cupida-specific thermal derating for dual-cell 4500mAh battery */
+static int oplus_vooc_cupida_thermal_derate(struct oplus_vooc_chip *chip, int vbat_temp_cur)
+{
+	/* Reduce current linearly from 100% to 50% between 42°C and 50°C */
+	if (vbat_temp_cur >= VOOC_CUPIDA_THERMAL_DERATE_START &&
+	    vbat_temp_cur <= VOOC_CUPIDA_THERMAL_DERATE_END) {
+		int derate_percent = 100 - ((vbat_temp_cur - VOOC_CUPIDA_THERMAL_DERATE_START) * 50 /
+					    (VOOC_CUPIDA_THERMAL_DERATE_END - VOOC_CUPIDA_THERMAL_DERATE_START));
+		return (chip->vooc_strategy_normal_current * derate_percent) / 100;
+	}
+	return chip->vooc_strategy_normal_current;
+}
+
 static int oplus_vooc_set_current_warm_range(struct oplus_vooc_chip *chip, int vbat_temp_cur)
 {
 	int ret = chip->vooc_strategy_normal_current;
@@ -491,7 +534,8 @@ static int oplus_vooc_set_current_warm_range(struct oplus_vooc_chip *chip, int v
 	} else {
 		chip->fastchg_batt_temp_status = BAT_TEMP_WARM;
 		chip->vooc_temp_cur_range = FASTCHG_TEMP_RANGE_WARM;
-		ret = chip->vooc_strategy_normal_current;
+		/* Apply Cupida-specific thermal derating */
+		ret = oplus_vooc_cupida_thermal_derate(chip, vbat_temp_cur);
 	}
 
 	return ret;
@@ -1753,6 +1797,15 @@ static void oplus_vooc_fastchg_func(struct work_struct *work)
 		}
 
 		oplus_vooc_wake_bcc_work_when_fastchg();
+
+		/* Apply adaptive current limit based on battery health */
+		if (chip->vooc_multistep_adjust_current_support == true) {
+			int adaptive_limit = oplus_vooc_get_adaptive_current_limit(chip);
+			if (adaptive_limit > 0 && adaptive_limit < ret_info) {
+				ret_info = adaptive_limit;
+				vooc_xlog_printk(CHG_LOG_CRTI, "adaptive current limit applied: %d\n", ret_info);
+			}
+		}
 
 		vooc_xlog_printk(CHG_LOG_CRTI, "temp_range[%d-%d-%d-%d-%d-%d]", chip->vooc_low_temp, chip->vooc_little_cold_temp,
 			chip->vooc_cool_temp, chip->vooc_little_cool_temp, chip->vooc_normal_low_temp, chip->vooc_normal_high_temp, chip->vooc_high_temp);

@@ -122,7 +122,7 @@ static DEFINE_MUTEX(g_charger_chip_mutex);
 #define BTBOVER_TEMP_MAX_INPUT_CURRENT		1000
 #define MIN_DELTA_SOC		1
 
-int enable_charger_log = 2;
+int enable_charger_log = 1;  /* 0=disabled, 1=errors only, 2=verbose */
 int charger_abnormal_log = 0;
 int tbatt_pwroff_enable = 1;
 static int mcu_status = 0;
