@@ -488,6 +488,8 @@ int is_vooc_support_old_svooc_1_0(void); /*20638 RT5125 50W*/
 int vooc_enable_cp_for_pdqc(void);
 int vooc_get_fastcharge_fail_count(void);
 
+int oplus_vooc_get_adaptive_current_limit(struct oplus_vooc_chip *chip);
+
 int oplus_vooc_get_uart_tx(void);
 int oplus_vooc_get_uart_rx(void);
 void oplus_vooc_uart_init(void);

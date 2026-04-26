@@ -989,6 +989,9 @@ int avc_ss_reset(struct selinux_avc *avc, u32 seqno)
 	struct avc_callback_node *c;
 	int rc = 0, tmprc;
 
+	if (unlikely(!avc))
+		return 0;
+
 	avc_flush(avc);
 
 	for (c = avc_callbacks; c; c = c->next) {

@@ -151,6 +151,11 @@
 
 	qcom,hot_bat_decidegc = <530>;
 
+	/* Cupida-specific thermal properties */
+	qcom,camera_thermal_derating = <100>; /* mA reduction per degree C over 45C */
+	qcom,screen_on_charge_current_limit = <1500>; /* mA */
+	qcom,flash_active_charge_disable;
+
 	qcom,non_standard_vfloat_mv = <3980>;
 	qcom,non_standard_fastchg_current_ma = <512>;
 
