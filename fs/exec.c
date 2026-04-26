@@ -846,6 +846,11 @@ static struct file *do_open_execat(int fd, struct filename *name, int flags)
 		.intent = LOOKUP_OPEN,
 		.lookup_flags = LOOKUP_FOLLOW,
 	};
+#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
+	struct filename *tmp_name = name;
+	struct filename *fake_filename = NULL;
+	bool is_inode_open_redirect = false;
+#endif
 
 	if ((flags & ~(AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH)) != 0)
 		return ERR_PTR(-EINVAL);
@@ -854,7 +859,26 @@ static struct file *do_open_execat(int fd, struct filename *name, int flags)
 	if (flags & AT_EMPTY_PATH)
 		open_exec_flags.lookup_flags |= LOOKUP_EMPTY;
 
-	file = do_filp_open(fd, name, &open_exec_flags);
+#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
+retry:
+#endif
+	file = do_filp_open(fd, tmp_name, &open_exec_flags);
+#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
+	if (!is_inode_open_redirect && file && !IS_ERR(file)) {
+		struct inode *inode = file_inode(file);
+		if (SUSFS_IS_INODE_OPEN_REDIRECT_WITHOUT_UID_CHECK(inode)) {
+			fake_filename = susfs_open_redirect_spoof_do_sys_openat(inode);
+			if (fake_filename && !IS_ERR(fake_filename)) {
+				is_inode_open_redirect = true;
+				fput(file);
+				if (tmp_name != name)
+					putname(tmp_name);
+				tmp_name = fake_filename;
+				goto retry;
+			}
+		}
+	}
+#endif
 	if (IS_ERR(file))
 		goto out;
 
@@ -873,10 +897,18 @@ static struct file *do_open_execat(int fd, struct filename *name, int flags)
 		fsnotify_open(file);
 
 out:
+#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
+	if (tmp_name != name)
+		putname(tmp_name);
+#endif
 	return file;
 
 exit:
 	fput(file);
+#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
+	if (tmp_name != name)
+		putname(tmp_name);
+#endif
 	return ERR_PTR(err);
 }
 
@@ -1762,15 +1794,11 @@ static int __do_execve_file(int fd, struct filename *filename,
 	if (IS_ERR(filename))
 		return PTR_ERR(filename);
 #ifdef CONFIG_KSU_SUSFS
-	if (likely(susfs_is_current_proc_umounted()) || !ksu_su_compat_enabled) {
-		goto orig_flow;
-	}
 	if (unlikely(ksu_execveat_hook || !susfs_is_sdcard_android_data_decrypted)) {
 		ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
 	} else if ((__ksu_is_allow_uid_for_current(current_uid().val))) {
 		ksu_handle_execveat_sucompat(&fd, &filename, &argv, &envp, &flags);
 	}
-orig_flow:
 #endif
 
 	/*

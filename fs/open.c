@@ -373,17 +373,7 @@ long do_faccessat(int dfd, const char __user *filename, int mode)
 	int res;
 	unsigned int lookup_flags = LOOKUP_FOLLOW;
 
-#ifdef CONFIG_KSU_SUSFS
-    if (likely(susfs_is_current_proc_umounted()) || !ksu_su_compat_enabled) {
-        goto orig_flow;
-    }
-
-    if (unlikely(__ksu_is_allow_uid_for_current(current_uid().val))) {
-        ksu_handle_faccessat(&dfd, &filename, &mode, NULL);
-    }
-
 orig_flow:
-#endif
 	if (mode & ~S_IRWXO)	/* where's F_OK, X_OK, W_OK, R_OK? */
 		return -EINVAL;
 
@@ -424,6 +414,12 @@ orig_flow:
 	override_cred->non_rcu = 1;
 
 	old_cred = override_creds(override_cred);
+#ifdef CONFIG_KSU_SUSFS
+    if (unlikely(__ksu_is_allow_uid_for_current(current_uid().val))) {
+		int flags_local = 0;
+		ksu_handle_faccessat(&dfd, &filename, &mode, &flags_local);
+    }
+#endif
 retry:
 	res = user_path_at(dfd, filename, lookup_flags, &path);
 	if (res)
