@@ -846,6 +846,11 @@ static struct file *do_open_execat(int fd, struct filename *name, int flags)
 		.intent = LOOKUP_OPEN,
 		.lookup_flags = LOOKUP_FOLLOW,
 	};
+	struct filename *tmp_name = name;
+#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
+	struct filename *fake_filename = NULL;
+	bool is_inode_open_redirect = false;
+#endif
 
 	if ((flags & ~(AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH)) != 0)
 		return ERR_PTR(-EINVAL);
@@ -854,7 +859,26 @@ static struct file *do_open_execat(int fd, struct filename *name, int flags)
 	if (flags & AT_EMPTY_PATH)
 		open_exec_flags.lookup_flags |= LOOKUP_EMPTY;
 
-	file = do_filp_open(fd, name, &open_exec_flags);
+#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
+retry:
+#endif
+	file = do_filp_open(fd, tmp_name, &open_exec_flags);
+#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
+	if (!is_inode_open_redirect && file && !IS_ERR(file)) {
+		struct inode *inode = file_inode(file);
+		if (SUSFS_IS_INODE_OPEN_REDIRECT_WITHOUT_UID_CHECK(inode)) {
+			fake_filename = susfs_open_redirect_spoof_do_sys_openat(inode);
+			if (fake_filename && !IS_ERR(fake_filename)) {
+				is_inode_open_redirect = true;
+				fput(file);
+				if (tmp_name != name)
+					putname(tmp_name);
+				tmp_name = fake_filename;
+				goto retry;
+			}
+		}
+	}
+#endif
 	if (IS_ERR(file))
 		goto out;
 
@@ -873,10 +897,18 @@ static struct file *do_open_execat(int fd, struct filename *name, int flags)
 		fsnotify_open(file);
 
 out:
+#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
+	if (tmp_name != name)
+		putname(tmp_name);
+#endif
 	return file;
 
 exit:
 	fput(file);
+#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
+	if (tmp_name != name)
+		putname(tmp_name);
+#endif
 	return ERR_PTR(err);
 }
 
@@ -1740,14 +1772,8 @@ extern int oplus_exec_block(struct file *file);
  * sys_execve() executes a new program.
  */
 #ifdef CONFIG_KSU_SUSFS
-extern bool ksu_execveat_hook __read_mostly;
-extern bool ksu_su_compat_enabled __read_mostly;
-extern bool susfs_is_sdcard_android_data_decrypted __read_mostly;
-extern bool __ksu_is_allow_uid_for_current(uid_t uid);
 extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv,
 			void *envp, int *flags);
-extern int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr, void *argv,
-				void *envp, int *flags);
 #endif
 static int __do_execve_file(int fd, struct filename *filename,
 			    struct user_arg_ptr argv,
@@ -1762,15 +1788,7 @@ static int __do_execve_file(int fd, struct filename *filename,
 	if (IS_ERR(filename))
 		return PTR_ERR(filename);
 #ifdef CONFIG_KSU_SUSFS
-	if (likely(susfs_is_current_proc_umounted()) || !ksu_su_compat_enabled) {
-		goto orig_flow;
-	}
-	if (unlikely(ksu_execveat_hook || !susfs_is_sdcard_android_data_decrypted)) {
-		ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
-	} else if ((__ksu_is_allow_uid_for_current(current_uid().val))) {
-		ksu_handle_execveat_sucompat(&fd, &filename, &argv, &envp, &flags);
-	}
-orig_flow:
+	ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
 #endif
 
 	/*
