@@ -409,10 +409,9 @@ static int mtk_gpio_create_attr(void)
 			}
 
 			err = device_create_file(hw->dev, &dev_attr_mt_gpio);
-			if (err) {
+			if (err)
 				pr_notice("[pinctrl]error create mtk_gpio\n");
-				break;
-			}
+			return err;
 		}
 
 		pin = (pin + 1) - gdesc->gdev->chip->base;

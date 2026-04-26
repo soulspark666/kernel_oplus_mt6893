@@ -2683,8 +2683,8 @@ static int mtk_charger_parse_dt(struct charger_manager *info,
 	if (of_property_read_u32(np, "pe40_stop_battery_soc", &val) >= 0)
 		info->data.pe40_stop_battery_soc = val;
 	else {
-		chr_err("use default pe40_stop_battery_soc:%d\n", 80);
-		info->data.pe40_stop_battery_soc = 80;
+		chr_err("use default pe40_stop_battery_soc:%d\n", 100);
+		info->data.pe40_stop_battery_soc = 100;
 	}
 
 	if (of_property_read_u32(np, "pe40_max_vbus", &val) >= 0)

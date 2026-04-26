@@ -126,6 +126,13 @@ static struct pm_qos_request pm_qos_req;
 static int disable_sub_cp_count = 0;
 static int slave_trouble_count = 0;
 
+/* Reset slave CP trouble count to prevent permanent disable */
+void oplus_voocphy_reset_slave_trouble_count(void)
+{
+	slave_trouble_count = 0;
+}
+EXPORT_SYMBOL_GPL(oplus_voocphy_reset_slave_trouble_count);
+
 extern int oplus_chg_get_battery_btb_temp_cal(void);
 extern int oplus_chg_get_usb_btb_temp_cal(void);
 extern void oplus_chg_adc_switch_ctrl(void);
@@ -5266,6 +5273,10 @@ void oplus_voocphy_reset_fastchg_after_usbout(void)
 	oplus_vooc_switch_mode(NORMAL_CHARGER_MODE);
 	oplus_chg_clear_chargerid_info();
 	oplus_voocphy_reset_ibus_trouble_flag();
+	
+	/* Reset slave CP trouble count on fastchg exit */
+	oplus_voocphy_reset_slave_trouble_count();
+	
 	voocphy_cpufreq_update(CPU_CHG_FREQ_STAT_AUTO);
 	if (oplus_voocphy_get_bidirect_cp_support()) {
 		oplus_voocphy_set_chg_auto_mode(false);
