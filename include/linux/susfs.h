@@ -9,6 +9,8 @@
 #include <linux/susfs_def.h>
 #include <linux/statfs.h>
 
+struct filename;
+
 #define SUSFS_VERSION "v2.1.0"
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5,0,0)
 #define SUSFS_VARIANT "NON-GKI"
@@ -220,6 +222,7 @@ void susfs_set_cmdline_or_bootconfig(void __user **user_info);
 /* open_redirect */
 #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
 void susfs_add_open_redirect(void __user **user_info);
+struct filename *susfs_open_redirect_spoof_do_sys_openat(struct inode *inode);
 #endif
 
 /* sus_map */

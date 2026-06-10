@@ -32,7 +32,7 @@
 #include <linux/dnotify.h>
 #include <linux/compat.h>
 #ifdef CONFIG_KSU_SUSFS
-#include <linux/susfs_def.h>
+#include <linux/susfs.h>
 #endif
 
 #include "internal.h"
@@ -1102,10 +1102,6 @@ struct file *file_open_root(struct dentry *dentry, struct vfsmount *mnt,
 	return do_file_open_root(dentry, mnt, filename, &op);
 }
 EXPORT_SYMBOL(file_open_root);
-
-#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
-extern struct filename *susfs_open_redirect_spoof_do_sys_openat(struct inode *inode);
-#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
 
 long do_sys_open(int dfd, const char __user *filename, int flags, umode_t mode)
 {

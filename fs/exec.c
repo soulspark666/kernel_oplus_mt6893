@@ -63,7 +63,7 @@
 #include <linux/compat.h>
 #include <linux/vmalloc.h>
 #ifdef CONFIG_KSU_SUSFS
-#include <linux/susfs_def.h>
+#include <linux/susfs.h>
 #endif
 
 #include <linux/uaccess.h>
