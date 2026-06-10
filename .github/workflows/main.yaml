@@ -9,67 +9,89 @@ on:
       kernel_branch:
         description: "Kernel branch to build"
         required: true
-        default: "susfs"
+        default: "resukisu-susfs-kpm"
       kernel_config:
         description: "Kernel config to build"
         required: false
         default: "mt6893_defconfig"
 
 jobs:
-  Build-Kernel:
-    strategy:
-      fail-fast: false
+  build:
     runs-on: ubuntu-22.04
-
     permissions:
       contents: write
 
     steps:
-      - name: Checkout current repository
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.kernel_branch || github.ref_name }}
           submodules: recursive
-          path: kernel_workspace
-      
+
       - name: Patch KSU version base
         run: |
-          sed -i 's/30000 + $(KSU_LOCAL_VERSION) + 700/35000 + $(KSU_LOCAL_VERSION) + 700/' \
-          kernel_workspace/KernelSU/kernel/Kbuild
-    
+          sed -i 's/30000 + $(KSU_LOCAL_VERSION) + 700/35000 + $(KSU_LOCAL_VERSION) + 700/' KernelSU/kernel/Kbuild
+
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ccache lld
+          sudo apt-get install -y bc bison build-essential curl flex gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi git libncurses5-dev libssl-dev python3 zip
+
+      - name: Set up Proton Clang
+        run: |
+          git clone --depth=1 https://github.com/kdrag0n/proton-clang.git toolchain/proton-clang
 
       - name: Build Kernel
-        uses: dabao1955/kernel_build_action@main
         env:
-          LLVM: 1
-          LLVM_IAS: 1
+          ARCH: arm64
+          SUBARCH: arm64
+          DEFCONFIG: ${{ github.event.inputs.kernel_config || 'mt6893_defconfig' }}
+          KBUILD_BUILD_USER: xCaptaiN09
+          KBUILD_BUILD_HOST: NetHunter
+        run: |
+          set -euo pipefail
+          export PATH="$GITHUB_WORKSPACE/toolchain/proton-clang/bin:$PATH"
+          make O=out ARCH=arm64 \
+            CC=clang \
+            HOSTCC=gcc \
+            HOSTCXX=g++ \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            "$DEFCONFIG"
+          make O=out ARCH=arm64 SUBARCH=arm64 \
+            CC=clang \
+            LD=ld.lld \
+            AR=llvm-ar \
+            NM=llvm-nm \
+            OBJCOPY=llvm-objcopy \
+            OBJDUMP=llvm-objdump \
+            STRIP=llvm-strip \
+            HOSTCC=gcc \
+            HOSTCXX=g++ \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            CONFIG_NO_ERROR_ON_MISMATCH=y \
+            -j"$(nproc)"
+          test -f out/arch/arm64/boot/Image.gz-dtb
+
+      - name: Upload Image.gz-dtb
+        uses: actions/upload-artifact@v4
         with:
-          kernel-url: kernel_workspace/
-          kernel-branch: ${{ github.event.inputs.kernel_branch || github.ref_name }}
-          ccache: true
-          config: ${{ github.event.inputs.kernel_config || 'mt6893_defconfig' }}
-          arch: arm64
-          aosp-gcc: false
-          aosp-clang: false
-          other-clang-url: https://github.com/kdrag0n/proton-clang.git
-          other-clang-branch: master
-          other-gcc32-url: https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9
-          other-gcc32-branch: lineage-19.1
-          other-gcc64-url: https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9
-          other-gcc64-branch: lineage-19.1
-          ksu: false
-          ksu-other: false
-          disable-lto: true
-          anykernel3: true
-          anykernel3-url: https://github.com/liwhy1/AnyKernel3
-          access-token: ${{ secrets.GITHUB_TOKEN }}
-          release: true
-          extra-make-args: '[ 
-            "CC=clang",
-            "CONFIG_NO_ERROR_ON_MISMATCH=y",
-            "CLANG_TRIPLE=aarch64-linux-gnu-"
-          ]'
+          name: Image.gz-dtb
+          path: out/arch/arm64/boot/Image.gz-dtb
+
+      - name: Create AnyKernel3 Zip
+        run: |
+          git clone --depth=1 https://github.com/liwhy1/AnyKernel3.git AnyKernel3
+          cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
+          cd AnyKernel3
+          rm -rf .git
+          zip -r9 ../ReSukiSU_OP6893_KPM.zip *
+
+      - name: Upload Flashable Zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: ReSukiSU_OP6893_KPM
+          path: ReSukiSU_OP6893_KPM.zip
