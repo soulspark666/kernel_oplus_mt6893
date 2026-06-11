@@ -749,10 +749,16 @@ out_copy_to_user:
 
 void susfs_spoof_cmdline_or_bootconfig(struct seq_file *m) {
 	unsigned seq;
+	const char *buf;
+
+	if (!static_branch_likely(&susfs_is_fake_cmdline_or_bootconfig_buffer_set))
+		return;
 
 	do {
 		seq = read_seqbegin(&susfs_fake_cmdline_or_bootconfig_seqlock);
-		seq_puts(m, fake_cmdline_or_bootconfig);
+		buf = fake_cmdline_or_bootconfig;
+		if (buf)
+			seq_puts(m, buf);
 	} while (read_seqretry(&susfs_fake_cmdline_or_bootconfig_seqlock, seq));
 }
 #endif
