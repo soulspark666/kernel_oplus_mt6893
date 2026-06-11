@@ -239,7 +239,7 @@ int susfs_get_data_path(struct path *path) {
 #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 // - Default to false now so zygisk can pick up the sus mounts without the need to turn it off manually in post-fs-data stage
 //   otherwise user needs to turn it on in post-fs-data stage and turn it off in boot-completed stage
-bool susfs_hide_sus_mnts_for_non_su_procs = false;
+bool susfs_hide_sus_mnts_for_non_su_procs = true;
 
 void susfs_set_hide_sus_mnts_for_non_su_procs(void __user **user_info) {
 	struct st_susfs_hide_sus_mnts_for_non_su_procs info = {0};
