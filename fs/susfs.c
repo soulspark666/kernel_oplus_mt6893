@@ -1477,3 +1477,15 @@ void susfs_init(void) {
 /* No module exit is needed becuase it should never be a loadable kernel module */
 //void __init susfs_exit(void)
 
+
+bool susfs_is_sdcard_android_data_decrypted(const char *path)
+{
+	if (!path)
+		return false;
+	if (strncmp(path, "/data/media/0/Android/data/", 27) == 0)
+		return true;
+	if (strncmp(path, "/data/media/0/Android/obb/", 26) == 0)
+		return true;
+	return false;
+}
+EXPORT_SYMBOL_GPL(susfs_is_sdcard_android_data_decrypted);
