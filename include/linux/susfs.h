@@ -5,6 +5,7 @@
 #include <linux/types.h>
 #include <linux/utsname.h>
 #include <linux/hashtable.h>
+#include <linux/jump_label.h>
 #include <linux/path.h>
 #include <linux/susfs_def.h>
 #include <linux/statfs.h>
@@ -160,6 +161,8 @@ struct st_susfs_sus_map {
 #endif
 
 /* avc log spoofing */
+DECLARE_STATIC_KEY_FALSE(susfs_is_avc_log_spoofing_enabled);
+
 struct st_susfs_avc_log_spoofing {
 	bool                                    enabled;
 	int                                     err;

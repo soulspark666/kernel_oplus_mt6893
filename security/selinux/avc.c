@@ -29,6 +29,9 @@
 #include <linux/ip.h>
 #include <linux/audit.h>
 #include <linux/ipv6.h>
+#ifdef CONFIG_KSU_SUSFS
+#include <linux/susfs.h>
+#endif
 #include <net/ipv6.h>
 #include "avc.h"
 #include "avc_ss.h"
@@ -167,7 +170,6 @@ static void avc_dump_av(struct audit_buffer *ab, u16 tclass, u32 av)
 #ifdef CONFIG_KSU_SUSFS
 extern u32 susfs_ksu_sid;
 extern u32 susfs_priv_app_sid;
-bool susfs_is_avc_log_spoofing_enabled = false;
 #endif
 
 /**
@@ -195,7 +197,8 @@ static void avc_dump_query(struct audit_buffer *ab, struct selinux_state *state,
 
 
 #ifdef CONFIG_KSU_SUSFS
-	if (unlikely(tsid == susfs_ksu_sid && READ_ONCE(susfs_is_avc_log_spoofing_enabled))) {
+	if (unlikely(tsid == susfs_ksu_sid &&
+		     static_branch_unlikely(&susfs_is_avc_log_spoofing_enabled))) {
 		if (rc)
 			audit_log_format(ab, " tsid=%d", susfs_priv_app_sid);
 		else
