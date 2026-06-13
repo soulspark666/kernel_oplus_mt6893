@@ -182,9 +182,6 @@ static void avc_dump_query(struct audit_buffer *ab, struct selinux_state *state,
 	int rc;
 	char *scontext;
 	u32 scontext_len;
-#ifdef CONFIG_KSU_SUSFS
-	struct selinux_audit_data sad;
-#endif
 
 	rc = security_sid_to_context(state, ssid, &scontext, &scontext_len);
 
@@ -200,11 +197,13 @@ static void avc_dump_query(struct audit_buffer *ab, struct selinux_state *state,
 
 #ifdef CONFIG_KSU_SUSFS
 	if (static_branch_likely(&susfs_is_avc_log_spoofing_enabled)) {
-		if (unlikely(sad.tsid == susfs_ksu_sid)) {
+		if (unlikely(tsid == susfs_ksu_sid)) {
 			if (rc)
 				audit_log_format(ab, " tsid=%d", susfs_priv_app_sid);
-			else
+			else {
 				audit_log_format(ab, " tcontext=%s", "u:r:priv_app:s0:c512,c768");
+				kfree(scontext);
+			}
 			goto bypass_orig_flow;
 		}
 	}
@@ -989,6 +988,9 @@ static void avc_flush(struct selinux_avc *avc)
 	unsigned long flag;
 	int i;
 
+	if (unlikely(!avc || (unsigned long)avc < PAGE_SIZE))
+		return;
+
 	for (i = 0; i < AVC_CACHE_SLOTS; i++) {
 		head = &avc->avc_cache.slots[i];
 		lock = &avc->avc_cache.slots_lock[i];
@@ -1015,7 +1017,7 @@ int avc_ss_reset(struct selinux_avc *avc, u32 seqno)
 	struct avc_callback_node *c;
 	int rc = 0, tmprc;
 
-	if (unlikely(!avc))
+	if (unlikely(!avc || (unsigned long)avc < PAGE_SIZE))
 		return 0;
 
 	avc_flush(avc);
