@@ -182,9 +182,6 @@ static void avc_dump_query(struct audit_buffer *ab, struct selinux_state *state,
 	int rc;
 	char *scontext;
 	u32 scontext_len;
-#ifdef CONFIG_KSU_SUSFS
-	struct selinux_audit_data sad;
-#endif
 
 	rc = security_sid_to_context(state, ssid, &scontext, &scontext_len);
 
@@ -200,11 +197,13 @@ static void avc_dump_query(struct audit_buffer *ab, struct selinux_state *state,
 
 #ifdef CONFIG_KSU_SUSFS
 	if (static_branch_likely(&susfs_is_avc_log_spoofing_enabled)) {
-		if (unlikely(sad.tsid == susfs_ksu_sid)) {
+		if (unlikely(tsid == susfs_ksu_sid)) {
 			if (rc)
 				audit_log_format(ab, " tsid=%d", susfs_priv_app_sid);
-			else
+			else {
 				audit_log_format(ab, " tcontext=%s", "u:r:priv_app:s0:c512,c768");
+				kfree(scontext);
+			}
 			goto bypass_orig_flow;
 		}
 	}
@@ -981,17 +980,21 @@ out:
 /**
  * avc_flush - Flush the cache
  */
-static void avc_flush(struct selinux_avc *avc)
+static noinline void avc_flush(struct selinux_avc *avc)
 {
 	struct hlist_head *head;
 	struct avc_node *node;
 	spinlock_t *lock;
 	unsigned long flag;
 	int i;
+	struct selinux_avc *real_avc = READ_ONCE(avc);
+
+	if (WARN_ON_ONCE(!real_avc))
+		return;
 
 	for (i = 0; i < AVC_CACHE_SLOTS; i++) {
-		head = &avc->avc_cache.slots[i];
-		lock = &avc->avc_cache.slots_lock[i];
+		head = &real_avc->avc_cache.slots[i];
+		lock = &real_avc->avc_cache.slots_lock[i];
 
 		spin_lock_irqsave(lock, flag);
 		/*
@@ -1000,7 +1003,7 @@ static void avc_flush(struct selinux_avc *avc)
 		 */
 		rcu_read_lock();
 		hlist_for_each_entry(node, head, list)
-			avc_node_delete(avc, node);
+			avc_node_delete(real_avc, node);
 		rcu_read_unlock();
 		spin_unlock_irqrestore(lock, flag);
 	}
@@ -1014,11 +1017,12 @@ int avc_ss_reset(struct selinux_avc *avc, u32 seqno)
 {
 	struct avc_callback_node *c;
 	int rc = 0, tmprc;
+	struct selinux_avc *real_avc = READ_ONCE(avc);
 
-	if (unlikely(!avc))
+	if (WARN_ON_ONCE(!real_avc))
 		return 0;
 
-	avc_flush(avc);
+	avc_flush(real_avc);
 
 	for (c = avc_callbacks; c; c = c->next) {
 		if (c->events & AVC_CALLBACK_RESET) {
@@ -1030,7 +1034,7 @@ int avc_ss_reset(struct selinux_avc *avc, u32 seqno)
 		}
 	}
 
-	avc_latest_notif_update(avc, seqno, 0);
+	avc_latest_notif_update(real_avc, seqno, 0);
 	return rc;
 }
 
