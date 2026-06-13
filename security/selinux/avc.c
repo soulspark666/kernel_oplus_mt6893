@@ -182,9 +182,6 @@ static void avc_dump_query(struct audit_buffer *ab, struct selinux_state *state,
 	int rc;
 	char *scontext;
 	u32 scontext_len;
-#ifdef CONFIG_KSU_SUSFS
-	struct selinux_audit_data sad;
-#endif
 
 	rc = security_sid_to_context(state, ssid, &scontext, &scontext_len);
 
@@ -200,11 +197,13 @@ static void avc_dump_query(struct audit_buffer *ab, struct selinux_state *state,
 
 #ifdef CONFIG_KSU_SUSFS
 	if (static_branch_likely(&susfs_is_avc_log_spoofing_enabled)) {
-		if (unlikely(sad.tsid == susfs_ksu_sid)) {
+		if (unlikely(tsid == susfs_ksu_sid)) {
 			if (rc)
 				audit_log_format(ab, " tsid=%d", susfs_priv_app_sid);
-			else
+			else {
 				audit_log_format(ab, " tcontext=%s", "u:r:priv_app:s0:c512,c768");
+				kfree(scontext);
+			}
 			goto bypass_orig_flow;
 		}
 	}
@@ -775,6 +774,8 @@ static void avc_audit_pre_callback(struct audit_buffer *ab, void *a)
 static void avc_audit_post_callback(struct audit_buffer *ab, void *a)
 {
 	struct common_audit_data *ad = a;
+	pr_err("DEBUG_AVC: entering avc_audit_post_callback, ad=%px, state=%px, state->avc=%px\n", 
+		ad, ad->selinux_audit_data->state, ad->selinux_audit_data->state->avc);
 	audit_log_format(ab, " ");
 	avc_dump_query(ab, ad->selinux_audit_data->state,
 		       ad->selinux_audit_data->ssid,
@@ -828,7 +829,9 @@ noinline int slow_avc_audit(struct selinux_state *state,
 
 	a->selinux_audit_data = &sad;
 
+	pr_err("DEBUG_AVC: slow_avc_audit about to call common_lsm_audit, state=%px, state->avc=%px\n", state, state->avc);
 	common_lsm_audit(a, avc_audit_pre_callback, avc_audit_post_callback);
+	pr_err("DEBUG_AVC: slow_avc_audit returned from common_lsm_audit\n");
 	return 0;
 }
 
@@ -981,17 +984,24 @@ out:
 /**
  * avc_flush - Flush the cache
  */
-static void avc_flush(struct selinux_avc *avc)
+static noinline void avc_flush(struct selinux_avc *avc)
 {
 	struct hlist_head *head;
 	struct avc_node *node;
 	spinlock_t *lock;
 	unsigned long flag;
 	int i;
+	struct selinux_avc *real_avc = READ_ONCE(avc);
+
+	pr_err("DEBUG_AVC: entering avc_flush, avc=%px, real_avc=%px\n", avc, real_avc);
+	if (WARN_ON_ONCE(!real_avc)) {
+		pr_err("DEBUG_AVC: avc_flush returning early because real_avc is NULL\n");
+		return;
+	}
 
 	for (i = 0; i < AVC_CACHE_SLOTS; i++) {
-		head = &avc->avc_cache.slots[i];
-		lock = &avc->avc_cache.slots_lock[i];
+		head = &real_avc->avc_cache.slots[i];
+		lock = &real_avc->avc_cache.slots_lock[i];
 
 		spin_lock_irqsave(lock, flag);
 		/*
@@ -1000,7 +1010,7 @@ static void avc_flush(struct selinux_avc *avc)
 		 */
 		rcu_read_lock();
 		hlist_for_each_entry(node, head, list)
-			avc_node_delete(avc, node);
+			avc_node_delete(real_avc, node);
 		rcu_read_unlock();
 		spin_unlock_irqrestore(lock, flag);
 	}
@@ -1014,11 +1024,15 @@ int avc_ss_reset(struct selinux_avc *avc, u32 seqno)
 {
 	struct avc_callback_node *c;
 	int rc = 0, tmprc;
+	struct selinux_avc *real_avc = READ_ONCE(avc);
 
-	if (unlikely(!avc))
+	pr_err("DEBUG_AVC: entering avc_ss_reset, avc=%px, real_avc=%px\n", avc, real_avc);
+	if (WARN_ON_ONCE(!real_avc)) {
+		pr_err("DEBUG_AVC: avc_ss_reset returning early because real_avc is NULL\n");
 		return 0;
+	}
 
-	avc_flush(avc);
+	avc_flush(real_avc);
 
 	for (c = avc_callbacks; c; c = c->next) {
 		if (c->events & AVC_CALLBACK_RESET) {
@@ -1030,7 +1044,7 @@ int avc_ss_reset(struct selinux_avc *avc, u32 seqno)
 		}
 	}
 
-	avc_latest_notif_update(avc, seqno, 0);
+	avc_latest_notif_update(real_avc, seqno, 0);
 	return rc;
 }
 
