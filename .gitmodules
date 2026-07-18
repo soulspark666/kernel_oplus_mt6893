@@ -1,4 +1,4 @@
 [submodule "KernelSU"]
 	path = KernelSU
-	url = https://github.com/xCaptaiN09/android_kernel_oplus_mt6893.git
-	branch = resukisu-kpm-kernelsu
+	url = https://github.com/ReSukiSU/ReSukiSU.git
+	branch = main
