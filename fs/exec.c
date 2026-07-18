@@ -836,6 +836,11 @@ EXPORT_SYMBOL(transfer_args_to_stack);
 
 #endif /* CONFIG_MMU */
 
+#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
+#include <linux/susfs_def.h>
+extern struct filename *susfs_open_redirect_spoof_do_sys_openat(struct inode *inode);
+#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
+
 static struct file *do_open_execat(int fd, struct filename *name, int flags)
 {
 	struct file *file;
