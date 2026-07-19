@@ -30,7 +30,7 @@ jobs:
 
       - name: Patch KSU version base
         run: |
-          sed -i 's/30000 + $(KSU_LOCAL_VERSION) + 700/35000 + $(KSU_LOCAL_VERSION) + 700/' KernelSU/kernel/Kbuild
+          sed -i 's/30000 + $(KSU_LOCAL_VERSION) + 700/350000 + $(KSU_LOCAL_VERSION) + 700/' KernelSU/kernel/Kbuild
 
       - name: Install dependencies
         run: |
