@@ -26,6 +26,7 @@
 #include "mount.h"
 
 extern void setup_selinux(const char *domain, struct cred *cred);
+extern bool susfs_is_current_ksu_domain(void);
 
 #ifdef CONFIG_KSU_SUSFS_ENABLE_LOG
 DEFINE_STATIC_KEY_TRUE(susfs_is_log_enabled);
