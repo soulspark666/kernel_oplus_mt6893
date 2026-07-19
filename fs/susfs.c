@@ -1502,3 +1502,18 @@ bool susfs_is_sdcard_android_data_decrypted(const char *path)
 	return false;
 }
 EXPORT_SYMBOL_GPL(susfs_is_sdcard_android_data_decrypted);
+
+#ifdef CONFIG_KSU_SUSFS_SUS_PATH
+static void susfs_extra_works_fn(struct work_struct *work)
+{
+	susfs_run_sus_path_loop();
+}
+DECLARE_WORK(susfs_extra_works, susfs_extra_works_fn);
+EXPORT_SYMBOL_GPL(susfs_extra_works);
+#else
+static void susfs_extra_works_fn(struct work_struct *work)
+{
+}
+DECLARE_WORK(susfs_extra_works, susfs_extra_works_fn);
+EXPORT_SYMBOL_GPL(susfs_extra_works);
+#endif
