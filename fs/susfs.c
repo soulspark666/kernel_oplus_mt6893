@@ -25,7 +25,17 @@
 #include "fuse/fuse_i.h"
 #include "mount.h"
 
-extern bool susfs_is_current_ksu_domain(void);
+// susfs_is_current_ksu_domain() used to be provided by KernelSU/kernel/selinux/selinux.c,
+// but that definition is inside an #ifdef CONFIG_KSU_SUSFS block there (ReSukiSU's own
+// hook-choice flag, which we don't use - manual hook instead). is_ksu_domain() itself is
+// NOT gated the same way and is always available, so provide the wrapper here instead.
+// Must have external linkage (not static) - fs/proc_namespace.c also calls this via its
+// own separate extern declaration from a different translation unit.
+extern bool is_ksu_domain(void);
+bool susfs_is_current_ksu_domain(void)
+{
+	return is_ksu_domain();
+}
 extern void setup_selinux(const char *domain, struct cred *cred);
 
 #ifdef CONFIG_KSU_SUSFS_ENABLE_LOG
