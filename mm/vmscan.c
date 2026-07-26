@@ -53,6 +53,7 @@
 #include <linux/shmem_fs.h>
 #include <linux/ctype.h>
 #include <linux/debugfs.h>
+#include <linux/proc_fs.h>
 
 #include <asm/tlbflush.h>
 #include <asm/div64.h>
@@ -4672,22 +4673,16 @@ static long get_nr_to_scan(struct lruvec *lruvec, struct scan_control *sc, bool 
 		return 0;
 
 
-	if (!mem_cgroup_online(memcg))
-		priority = 0;
-	else if (sc->nr_reclaimed - reclaimed >= sc->nr_to_reclaim)
-		priority = DEF_PRIORITY;
-	else
-		priority = sc->priority;
+	/* reset the priority if the target has been met */
+	nr_to_scan >>= sc->nr_reclaimed < sc->nr_to_reclaim ? sc->priority : DEF_PRIORITY;
 
-	nr_to_scan >>= priority;
+	if (!mem_cgroup_online(memcg))
+		nr_to_scan++;
+
 	if (!nr_to_scan)
 		return 0;
 
 	if (!*need_aging)
-		return nr_to_scan;
-
-	/* skip the aging path at the default priority */
-	if (priority == DEF_PRIORITY)
 		return nr_to_scan;
 
 	/* leave the work to lru_gen_age_node() */
