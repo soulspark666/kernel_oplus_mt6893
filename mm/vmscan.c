@@ -3866,12 +3866,12 @@ static struct lru_gen_mm_walk *alloc_mm_walk(void)
 		return current->reclaim_state->mm_walk;
 
 	return kzalloc(sizeof(struct lru_gen_mm_walk),
-		       __GFP_HIGH | __GFP_NOMEMALLOC | __GFP_NOWARN);
+		       GFP_KERNEL | __GFP_NOMEMALLOC | __GFP_NOWARN);
 }
 
 static void free_mm_walk(struct lru_gen_mm_walk *walk)
 {
-	if (!current->reclaim_state || !current->reclaim_state->mm_walk)
+	if (!current->reclaim_state || walk != current->reclaim_state->mm_walk)
 		kfree(walk);
 }
 
