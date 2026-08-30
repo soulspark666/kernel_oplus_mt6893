@@ -795,7 +795,10 @@ CONFIG_MTK_CONNFEM=y
 CONFIG_TRACE_GPU_MEM=y
 
 
-# ReSukiSU
+# ReSukiSU - SUSFS Inline Hooks
+# Integrated via JackA1ltman/susfs_inline_hook_patches.sh (20251120) with logical fixes
+# Reference: https://resukisu.github.io/guide/manual-integrate.html
+# SUSFS Inline Hook requires KSU_SUSFS=y and KALLSYMS_ALL=y (no MANUAL_HOOK)
 CONFIG_KSU=y
 # CONFIG_KPM is not set
 # CONFIG_KSU_MANUAL_HOOK is not set
