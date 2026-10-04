@@ -106,11 +106,13 @@ while [ "$(date +%s)" -lt "$end" ]; do
 	# Single remote round trip: gather all samples in one shell so the
 	# series stays time-aligned instead of drifting per-field.
 	line=$(sh_ '
-		# One awk pass over thermalservice: pull mValue by mType
-		# (3 = mtktsAP, 2 = battery) plus the AP mStatus. Only
-		# "Temperature{" records, never the TemperatureThreshold ones
-		# which also carry mType.
-		ts=$(dumpsys thermalservice)
+		# IMPORTANT: dumpsys thermalservice prints mtktsAP TWICE:
+		#   under "Cached temperatures:"      <- frozen, NOT live
+		#   under "Current temperatures from HAL:"  <- live
+		# Taking the first match silently reports a stale value that never
+		# moves, which looks exactly like a stable sensor. Parse ONLY the
+		# "Current temperatures from HAL:" section.
+		ts=$(dumpsys thermalservice | sed -n "/Current temperatures from HAL:/,/Current cooling devices/p")
 		parsed=$(echo "$ts" | awk "
 			/Temperature[{]/ {
 				v=\"\"; t=\"\"; s=\"\"

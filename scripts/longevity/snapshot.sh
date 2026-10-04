@@ -90,7 +90,16 @@ for p in 0 4 7; do
 done
 
 sec "THERMAL (C-1: observe only, never write)"
-sh_ 'dumpsys thermalservice | grep -E "mName=mtktsAP" -A2' >>"$FILE"
+# NOTE: dumpsys thermalservice reports mtktsAP twice - once under
+# "Cached temperatures:" (frozen) and once under "Current temperatures
+# from HAL:" (live). Both are printed so the two are never confused
+# again; only the live one may be used for pass/fail.
+printf 'CACHED (not for pass/fail):\n' >>"$FILE"
+sh_ 'dumpsys thermalservice | sed -n "/Cached temperatures:/,/HAL Ready/p" | grep -E "mType=[0-9]+, mName="' >>"$FILE"
+printf '\nLIVE from HAL (this is the one that matters):\n' >>"$FILE"
+sh_ 'dumpsys thermalservice | sed -n "/Current temperatures from HAL:/,/Current cooling devices/p"' >>"$FILE"
+printf 'thermal status line: %s\n' \
+	"$(sh_ 'dumpsys thermalservice | grep -m1 "^Thermal Status:"')" >>"$FILE"
 printf 'thermal thresholds:\n' >>"$FILE"
 sh_ 'dumpsys thermalservice | grep -E "mName=mtktsAP.*mHotThrottling"' >>"$FILE"
 
