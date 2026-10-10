@@ -426,6 +426,15 @@ struct lru_gen_mm_walk {
 	int batched;
 	bool can_swap;
 	bool full_scan;
+	/*
+	 * True only when this walk came from kzalloc() in alloc_mm_walk().
+	 * pg_data_t embeds one of these (pg_data_t::mm_walk), and reclaim_state
+	 * can point at it, so free_mm_walk() must never infer ownership from
+	 * current->reclaim_state: that pointer can be cleared between the
+	 * alloc and the free, which would make kfree() run on an address
+	 * inside the vzalloc'd pg_data_t.
+	 */
+	bool from_kzalloc;
 };
 
 void lru_gen_init_lruvec(struct lruvec *lruvec);

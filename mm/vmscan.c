@@ -3862,16 +3862,34 @@ static void walk_mm(struct lruvec *lruvec, struct mm_struct *mm, struct lru_gen_
 
 static struct lru_gen_mm_walk *alloc_mm_walk(void)
 {
+	struct lru_gen_mm_walk *walk;
+
 	if (current->reclaim_state && current->reclaim_state->mm_walk)
 		return current->reclaim_state->mm_walk;
 
-	return kzalloc(sizeof(struct lru_gen_mm_walk),
+	walk = kzalloc(sizeof(struct lru_gen_mm_walk),
 		       GFP_KERNEL | __GFP_NOMEMALLOC | __GFP_NOWARN);
+	if (walk)
+		walk->from_kzalloc = true;
+
+	return walk;
 }
 
 static void free_mm_walk(struct lru_gen_mm_walk *walk)
 {
-	if (!current->reclaim_state || walk != current->reclaim_state->mm_walk)
+	/*
+	 * Free only what alloc_mm_walk() actually allocated from the slab.
+	 *
+	 * reclaim_state->mm_walk may point at pgdat->mm_walk, which is
+	 * embedded in pg_data_t and therefore lives in the vzalloc'd node
+	 * memory, not on the slab. Testing it against
+	 * current->reclaim_state is not safe: that pointer is cleared by
+	 * lru_gen_age_node() on the way out and is absent entirely during
+	 * direct reclaim (try_to_free_pages), so the check can conclude the
+	 * embedded walk was heap allocated and kfree() an address that has
+	 * no slab page behind it -> data abort in kfree().
+	 */
+	if (walk && walk->from_kzalloc)
 		kfree(walk);
 }
 
