@@ -5,14 +5,12 @@
 #include <linux/types.h>
 #include <linux/utsname.h>
 #include <linux/hashtable.h>
-#include <linux/jump_label.h>
 #include <linux/path.h>
 #include <linux/susfs_def.h>
 #include <linux/statfs.h>
 
-struct filename;
-
-#define SUSFS_VERSION "v2.2.0"
+#define SUSFS_VERSION "v2.3.0"
+bool susfs_is_sdcard_android_data_decrypted(const char *path);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5,0,0)
 #define SUSFS_VARIANT "NON-GKI"
 #else
@@ -71,13 +69,13 @@ struct st_susfs_hide_sus_mnts_for_non_su_procs {
 #define KSTAT_SPOOF_ATIME_TV_NSEC (1 << 5)
 #define KSTAT_SPOOF_MTIME_TV_SEC (1 << 6)
 #define KSTAT_SPOOF_MTIME_TV_NSEC (1 << 7)
-#define KSTAT_SPOOF_CTIME_TV_SEC (1 < 8)
+#define KSTAT_SPOOF_CTIME_TV_SEC (1 << 8)
 #define KSTAT_SPOOF_CTIME_TV_NSEC (1 << 9)
 #define KSTAT_SPOOF_BLOCKS (1 << 10)
 #define KSTAT_SPOOF_BLKSIZE (1 << 11)
 
 struct st_susfs_sus_kstat {
-	int                                     is_statically;
+	bool                                    is_statically;
 	unsigned long                           target_ino;
 	char                                    target_pathname[SUSFS_MAX_LEN_PATHNAME];
 	unsigned long                           spoofed_ino;
@@ -97,11 +95,13 @@ struct st_susfs_sus_kstat {
 };
 
 struct st_susfs_sus_kstat_hlist {
+	struct hlist_node                       node;
 	unsigned long                           target_ino;
 	unsigned long                           target_dev;
+	struct kstatfs                          spoofed_kstatfs;
+	int                                     spoofed_mnt_id;
 	bool                                    is_fuse;
 	struct st_susfs_sus_kstat               info;
-	struct hlist_node                       node;
 };
 #endif
 
@@ -140,6 +140,7 @@ struct st_susfs_open_redirect {
 };
 
 struct st_susfs_open_redirect_hlist {
+	struct hlist_node                       node;
 	unsigned long                           target_ino;
 	unsigned long                           target_dev;
 	unsigned long                           redirected_ino;
@@ -148,7 +149,6 @@ struct st_susfs_open_redirect_hlist {
 	struct kstatfs                          spoofed_kstatfs;
 	struct st_susfs_open_redirect           info;
 	bool                                    reversed_lookup_only;
-	struct hlist_node                       node;
 };
 #endif
 
@@ -161,8 +161,6 @@ struct st_susfs_sus_map {
 #endif
 
 /* avc log spoofing */
-DECLARE_STATIC_KEY_FALSE(susfs_is_avc_log_spoofing_enabled);
-
 struct st_susfs_avc_log_spoofing {
 	bool                                    enabled;
 	int                                     err;
@@ -225,7 +223,6 @@ void susfs_set_cmdline_or_bootconfig(void __user **user_info);
 /* open_redirect */
 #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
 void susfs_add_open_redirect(void __user **user_info);
-struct filename *susfs_open_redirect_spoof_do_sys_openat(struct inode *inode);
 #endif
 
 /* sus_map */
@@ -243,6 +240,5 @@ void susfs_start_sdcard_monitor_fn(void);
 
 /* susfs_init */
 void susfs_init(void);
-bool susfs_is_sdcard_android_data_decrypted(const char *path);
 
 #endif
