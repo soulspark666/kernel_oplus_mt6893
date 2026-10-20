@@ -747,6 +747,8 @@ static void mtu3_gadget_init_eps(struct mtu3 *mtu)
 
 int mtu3_gadget_setup(struct mtu3 *mtu)
 {
+	int ret;
+
 	mtu->g.ops = &mtu3_gadget_ops;
 	mtu->g.max_speed = mtu->max_speed;
 	mtu->g.speed = USB_SPEED_UNKNOWN;

@@ -68,7 +68,7 @@ static inline void ssusb_gadget_exit(struct ssusb_mtk *ssusb)
 #endif
 
 
-#if IS_ENABLED(CONFIG_USB_MTU3_DUAL_ROLE)
+#if IS_ENABLED(CONFIG_USB_MTU3_GADGET) || IS_ENABLED(CONFIG_USB_MTU3_DUAL_ROLE)
 int ssusb_otg_switch_init(struct ssusb_mtk *ssusb);
 void ssusb_otg_switch_exit(struct ssusb_mtk *ssusb);
 void ssusb_mode_switch(struct ssusb_mtk *ssusb, int to_host);

@@ -438,16 +438,44 @@ static int get_ssusb_rscs(struct platform_device *pdev, struct ssusb_mtk *ssusb)
 		of_property_read_bool(node, "enable-manual-drd");
 	otg_sx->role_sw_used = of_property_read_bool(node, "usb-role-switch");
 
-	if (otg_sx->role_sw_used || otg_sx->manual_drd_enabled)
-		goto out;
-
+	/* Resolve the extcon even when the usb role switch is in use. The
+	 * role switch is only found by the extcon driver through a
+	 * name-based device connection, and that lookup can fail (the
+	 * provider may not have probed yet, or the name may not match), in
+	 * which case extcon->role_sw is NULL and nothing ever drives the
+	 * controller into device mode. The extcon notifiers are an
+	 * independent path to the same thing: EXTCON_USB rising makes the
+	 * mtu3 start as a device and EXTCON_USB_HOST falling switches the
+	 * u2 port to device mode. */
 	if (of_property_read_bool(node, "extcon")) {
 		otg_sx->edev = extcon_get_edev_by_phandle(ssusb->dev, 0);
 		if (IS_ERR(otg_sx->edev)) {
 			dev_err(ssusb->dev, "couldn't get extcon device\n");
-			return PTR_ERR(otg_sx->edev);
+			/* The extcon driver may simply not have probed yet:
+			 * defer so that this driver is retried instead of
+			 * silently losing the extcon path for good. */
+			if (otg_sx->edev == ERR_PTR(-EPROBE_DEFER))
+				return otg_sx->edev;
+			if (!otg_sx->role_sw_used &&
+			    !otg_sx->manual_drd_enabled)
+				return PTR_ERR(otg_sx->edev);
+			otg_sx->edev = NULL;
 		}
 	}
+
+	/* Fall back to looking the extcon up by name. The phandle lookup
+	 * above depends on the extcon device being registered and on the
+	 * phandle resolving to exactly the node the extcon driver bound to;
+	 * by name it is found regardless of the ordering. */
+	if (!otg_sx->edev) {
+		otg_sx->edev = extcon_get_extcon_dev("extcon_usb");
+		if (IS_ERR(otg_sx->edev) || !otg_sx->edev) {
+			return ERR_PTR(-EPROBE_DEFER);
+		}
+	}
+
+	if (otg_sx->role_sw_used || otg_sx->manual_drd_enabled)
+		goto out;
 
 out:
 	dev_info(dev, "dr_mode: %d, is_u3_dr: %d, u3p_dis_msk: %x, drd: %s\n",
@@ -518,6 +546,16 @@ static int mtu3_probe(struct platform_device *pdev)
 		ret = ssusb_gadget_init(ssusb);
 		if (ret) {
 			dev_err(dev, "failed to initialize gadget\n");
+			goto comm_exit;
+		}
+		/* Set up the extcon notifiers even in peripheral-only mode:
+		 * they are what tells the controller that a cable was plugged
+		 * in (start the gadget) or unplugged (disconnect it). Without
+		 * them the UDC stays "configured" after the cable is removed
+		 * and the PC keeps seeing a phone that is not there. */
+		ret = ssusb_otg_switch_init(ssusb);
+		if (ret) {
+			dev_err(dev, "failed to initialize switch\n");
 			goto comm_exit;
 		}
 		break;

@@ -566,6 +566,21 @@ static void tcpc_event_init_work(struct work_struct *work)
 	}
 #endif /* CONFIG_CHARGER_BQ2560X */
 	if (IS_ERR_OR_NULL(tcpc->chg_psy)) {
+		/* The DT "charger" phandle points at &mt6360_chg, which does
+		 * not publish a power_supply on this tree, so the lookup above
+		 * always failed. Failing here aborts tcpc_event_init_work()
+		 * before tcpc->pd_inited_flag is set, and with PD never
+		 * initialised no CC/BC1.2 attach event is ever produced --
+		 * which is exactly why usbid_evt stayed at 0 and EXTCON_USB
+		 * never rose. Fall back to the charger supplies this board
+		 * actually registers. */
+		tcpc->chg_psy = power_supply_get_by_name("mtk-master-charger");
+		if (IS_ERR_OR_NULL(tcpc->chg_psy))
+			tcpc->chg_psy = power_supply_get_by_name("charger");
+		if (IS_ERR_OR_NULL(tcpc->chg_psy))
+			tcpc->chg_psy = power_supply_get_by_name("usb");
+	}
+	if (IS_ERR_OR_NULL(tcpc->chg_psy)) {
 		tcpci_unlock_typec(tcpc);
 		TCPC_ERR("%s get charger psy fail\n", __func__);
 		return;

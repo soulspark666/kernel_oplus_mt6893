@@ -283,6 +283,7 @@ static int ssusb_extcon_register(struct otg_switch_mtk *otg_sx)
 	if (!edev)
 		return 0;
 
+
 	otg_sx->vbus_nb.notifier_call = ssusb_vbus_notifier;
 	ret = devm_extcon_register_notifier(ssusb->dev, edev, EXTCON_USB,
 					&otg_sx->vbus_nb);
@@ -442,6 +443,23 @@ static int ssusb_role_sw_set(struct device *dev, enum usb_role role)
 	id_event = (role == USB_ROLE_HOST);
 	vbus_event = (role == USB_ROLE_DEVICE);
 
+	/* Put the USB2/USB3 port into the requested direction.
+	 *
+	 * switch_port_to_device() is what clears SSUSB_U2_PORT_HOST_SEL and
+	 * powers the u2 port up as a device. It is only reached through the
+	 * ID_GROUND branch below, and that branch is skipped unless
+	 * MTU3_SW_ID_GROUND is set in sw_state. ssusb_otg_switch_init() seeds
+	 * sw_state with VBUS_VALID (not ID_GROUND) when the port does not
+	 * boot as a host, so on this board the port was never switched to
+	 * device at all: the controller stayed a host, the UDC sat at
+	 * "not attached" and the phone never enumerated on a PC even though
+	 * EXTCON_USB was already 1 and the gadget was bound to usb0.
+	 */
+	if (vbus_event)
+		switch_port_to_device(ssusb);
+	else if (id_event)
+		switch_port_to_host(ssusb);
+
 	if (!!(otg_sx->sw_state & MTU3_SW_VBUS_VALID) ^ vbus_event) {
 		if (vbus_event) {
 			if (ssusb->spm_mgr)
@@ -542,6 +560,15 @@ static int ssusb_role_sw_register(struct otg_switch_mtk *otg_sx)
 
 	role_sx_desc.set = ssusb_role_sw_set;
 	role_sx_desc.get = ssusb_role_sw_get;
+	/* The role switch has to advertise the fwnode it belongs to, otherwise
+	 * a consumer cannot find it: usb_role_switch_get() resolves the
+	 * consumer's "usb-role-switch" phandle to an fwnode and then looks for
+	 * a role class device whose dev_fwnode() matches it
+	 * (usb_role_switch_match() -> switch_fwnode_match()). With fwnode left
+	 * NULL the match can never succeed and every consumer silently gets a
+	 * NULL switch. */
+	role_sx_desc.fwnode = (ssusb->dev && ssusb->dev->of_node) ?
+		&ssusb->dev->of_node->fwnode : NULL;
 	otg_sx->role_sw = usb_role_switch_register(ssusb->dev, &role_sx_desc);
 
 	if (IS_ERR(otg_sx->role_sw))
@@ -702,6 +729,11 @@ int ssusb_otg_switch_init(struct ssusb_mtk *ssusb)
 	otg_sx->sw_state = ssusb->is_host ?
 				MTU3_SW_ID_GROUND : MTU3_SW_VBUS_VALID;
 
+	/* A peripheral-only port has no VBUS until a cable is plugged in;
+	 * the extcon tells us. Do not pretend it is already valid. */
+	if (ssusb->dr_mode == USB_DR_MODE_PERIPHERAL)
+		otg_sx->sw_state = 0;
+
 	/* initial operation mode */
 	otg_sx->op_mode = MTU3_DR_OPERATION_NORMAL;
 
@@ -716,12 +748,28 @@ int ssusb_otg_switch_init(struct ssusb_mtk *ssusb)
 	pr_info("%s: add default Vcore QOS request\n", __func__);
 	#endif
 
-	if (otg_sx->manual_drd_enabled)
+	if (otg_sx->manual_drd_enabled) {
 		ssusb_dr_debugfs_init(ssusb);
-	else if (otg_sx->role_sw_used)
-		ret = ssusb_role_sw_register(otg_sx);
-	else
-		ret = ssusb_extcon_register(otg_sx);
+	} else {
+		/* The usb role switch only exists in dual-role mode. In
+		 * gadget-only mode the extcon notifiers below are the only
+		 * source of the role -- and they are also what disconnects the
+		 * gadget when the cable is unplugged. */
+		if (otg_sx->role_sw_used && IS_ENABLED(CONFIG_USB_MTU3_DUAL_ROLE))
+			ret = ssusb_role_sw_register(otg_sx);
+		/* Always follow the extcon as well: it is the only source of the
+		 * device/host role that does not depend on somebody finding
+		 * the usb role switch. EXTCON_USB rising makes the mtu3 start
+		 * as a device and EXTCON_USB_HOST falling switches the u2 port
+		 * to device mode (switch_port_to_device). */
+		if (!otg_sx->edev) {
+			otg_sx->edev = extcon_get_extcon_dev("extcon_usb");
+			if (IS_ERR(otg_sx->edev))
+				otg_sx->edev = NULL;
+		}
+		if (otg_sx->edev)
+			ssusb_extcon_register(otg_sx);
+	}
 
 	return ret;
 }

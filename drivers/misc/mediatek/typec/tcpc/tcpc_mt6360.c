@@ -867,6 +867,7 @@ static int mt6360_set_cc(struct tcpc_device *tcpc, int pull);
 static int mt6360_get_cc(struct tcpc_device *tcpc, int *cc1, int *cc2);
 static void mt6360_enable_usbid_irq(struct mt6360_chip *chip, bool en);
 
+
 static int mt6360_enable_usbid_polling(struct mt6360_chip *chip, bool en)
 {
 	int ret;
@@ -2865,8 +2866,7 @@ static int mt6360_i2c_probe(struct i2c_client *client,
 	mt6360_enable_usbid_irq(chip, false);
 #endif /*OPLUS_FEATURE_CHG_BASIC*/
 #endif /* CONFIG_WATER_DETECTION */
-	dev_info(chip->dev, "%s successfully!\n", __func__);
-	return 0;
+
 
 err_sw_reset:
 	tcpc_device_unregister(chip->dev, chip->tcpc);
@@ -2882,7 +2882,7 @@ static int mt6360_i2c_remove(struct i2c_client *client)
 	struct mt6360_chip *chip = i2c_get_clientdata(client);
 
 	if (chip) {
-		cancel_delayed_work_sync(&chip->poll_work);
+
 #ifdef CONFIG_WD_SBU_POLLING
 		cancel_work_sync(&chip->wd_work);
 #ifdef OPLUS_FEATURE_CHG_BASIC

@@ -26,7 +26,7 @@ ifneq ($(filter y,$(CONFIG_USB_MTU3_GADGET) $(CONFIG_USB_MTU3_DUAL_ROLE)),)
 	mtu3-y	+= mtu3_core.o mtu3_gadget_ep0.o mtu3_gadget.o mtu3_qmu.o
 endif
 
-ifneq ($(CONFIG_USB_MTU3_DUAL_ROLE),)
+ifneq ($(filter y,$(CONFIG_USB_MTU3_GADGET) $(CONFIG_USB_MTU3_DUAL_ROLE)),)
 	mtu3-y	+= mtu3_dr.o
 endif
 

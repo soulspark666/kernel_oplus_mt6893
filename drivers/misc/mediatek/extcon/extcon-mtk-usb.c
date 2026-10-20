@@ -458,11 +458,19 @@ static int mtk_extcon_tcpc_notifier(struct notifier_block *nb,
 			noti->typec_state.new_state == TYPEC_ATTACHED_SRC) {
 			dev_info(dev, "Type-C SRC plug in\n");
 			mtk_usb_extcon_set_role(extcon, DUAL_PROP_DR_HOST);
-		} else if (!(extcon->bypss_typec_sink) &&
-			noti->typec_state.old_state == TYPEC_UNATTACHED &&
+		} else if (noti->typec_state.old_state == TYPEC_UNATTACHED &&
 			(noti->typec_state.new_state == TYPEC_ATTACHED_SNK ||
 			noti->typec_state.new_state == TYPEC_ATTACHED_NORP_SRC ||
 			noti->typec_state.new_state == TYPEC_ATTACHED_CUSTOM_SRC)) {
+			/* The bypass exists for the stock flow, where the BC1.2
+			 * charger layer calls mt_usb_connect_v1() instead.
+			 * mt_usb_connect_v1() is compiled out here (no
+			 * ADAPT_PSY_V1), and the DT node for this extcon is
+			 * replaced wholesale by the stock dtbo overlay, so
+			 * clearing mediatek,bypss-typec-sink in the base DTB
+			 * has no effect. Honour the sink attach here, or
+			 * EXTCON_USB never rises and the adb gadget never
+			 * binds. */
 			dev_info(dev, "Type-C SINK plug in\n");
 			mtk_usb_extcon_set_role(extcon, DUAL_PROP_DR_DEVICE);
 		} else if ((noti->typec_state.old_state == TYPEC_ATTACHED_SRC ||
@@ -746,13 +754,23 @@ static int mtk_usb_extcon_probe(struct platform_device *pdev)
 	extcon->dev_conn.endpoint[0] = kasprintf(GFP_KERNEL,
 				"%s-role-switch", dev_name(&conn_pdev->dev));
 	extcon->dev_conn.endpoint[1] = dev_name(extcon->dev);
-	extcon->dev_conn.id = "usb-role-switch";
-	device_connection_add(&extcon->dev_conn);
 
 	extcon->role_sw = usb_role_switch_get(extcon->dev);
 	if (IS_ERR(extcon->role_sw)) {
-		dev_err(dev, "failed to get usb role\n");
-		return PTR_ERR(extcon->role_sw);
+		/* No role-switch provider (or it has not probed yet). The mtu3
+		 * follows this extcon directly, so the extcon driver must
+		 * still come up. Do NOT publish the device connection before
+		 * this point: the connection is matched by name against strings
+		 * that live in this driver instance, and a failed probe frees
+		 * it. The connection would stay in the global list with a
+		 * dangling pointer and the next device_connection_find_match()
+		 * walk would fault (v24: "Unable to handle kernel paging request
+		 * at virtual address 0000000200000001" in __pi_strcmp, via
+		 * typec_register_port -> typec_switch_get). */
+		extcon->role_sw = NULL;
+	} else {
+		extcon->dev_conn.id = "usb-role-switch";
+		device_connection_add(&extcon->dev_conn);
 	}
 
 	/* vbus */

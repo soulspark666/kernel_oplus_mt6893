@@ -568,7 +568,17 @@ static int typec_init(struct rt_pd_manager_data *rpmd)
 {
 	int ret = 0;
 
-	rpmd->typec_caps.type = TYPEC_PORT_DRP;
+	/* This is the PD manager that actually binds (driver name "rt-pd-manager");
+	 * the OPLUS v2 one never probes because the DT node matches the stock
+	 * compatible first.
+	 *
+	 * Advertising TYPEC_PORT_DRP let the role callbacks drive the TCPC into
+	 * TYPEC_ROLE_DRP at boot ("typec_new_role: DRP" in dmesg). Against an
+	 * A-plug source a DRP drives its own Rp and resolves to SRC/Try.SRC,
+	 * never TYPEC_ATTACHED_SNK. Without SNK attach there is no BC1.2 result
+	 * (usbid_evt stayed at 0), EXTCON_USB never rose and the adb gadget
+	 * never bound. The board's own role_def is "SNK Only": pin it to sink. */
+	rpmd->typec_caps.type = TYPEC_PORT_SNK;
 	rpmd->typec_caps.data = TYPEC_PORT_DRD;
 	rpmd->typec_caps.revision = 0x0120;
 	rpmd->typec_caps.pd_revision = 0x0300;
@@ -585,6 +595,8 @@ static int typec_init(struct rt_pd_manager_data *rpmd)
 		rpmd->typec_caps.prefer_role = TYPEC_NO_PREFERRED_ROLE;
 		break;
 	}
+	/* Sink regardless: the NO_PREFERRED_ROLE case is what produced DRP. */
+	rpmd->typec_caps.prefer_role = TYPEC_SINK;
 	rpmd->typec_caps.try_role = tcpc_typec_try_role;
 	rpmd->typec_caps.dr_set = tcpc_typec_dr_set;
 	rpmd->typec_caps.pr_set = tcpc_typec_pr_set;
