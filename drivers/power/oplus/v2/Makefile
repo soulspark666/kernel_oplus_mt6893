@@ -15,6 +15,11 @@ ifeq ($(CONFIG_OPLUS_CHARGER_MTK),y)
 subdir-ccflags-y += -Werror
 subdir-ccflags-y += -Wno-unused-variable
 
+# The v2 MTK HALs gate their bodies on OPLUS_FEATURE_CHG_BASIC (ic
+# registration, TCPC notifier, GPIOs). Nothing else on this tree defines
+# it, so without this the HALs compile to psy-only stubs.
+ccflags-$(CONFIG_OPLUS_CHARGER_MTK) += -DOPLUS_FEATURE_CHG_BASIC
+
 subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/typec/tcpc/inc
 subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat
 subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include
@@ -23,11 +28,17 @@ ccflags-$(CONFIG_OPLUS_CHG_DYNAMIC_CONFIG) += -I$(srctree)/drivers/gpu/drm/media
 ccflags-$(CONFIG_OPLUS_CHARGER_MTK6895S) += -I$(srctree)/drivers/power/supply
 ccflags-$(CONFIG_OPLUS_CHARGER_MTK6895S) += -I$(srctree)/drivers/gpu/drm/mediatek/mediatek_v2
 ccflags-$(CONFIG_OPLUS_CHARGER_MTK6895S) += -I$(srctree)/drivers/base/kernelFwUpdate
+ccflags-$(CONFIG_OPLUS_CHARGER_MTK6893_V2_HAL) += -I$(srctree)/drivers/misc/mediatek/pmic/mt6360/inc
+ccflags-$(CONFIG_OPLUS_CHARGER_MTK6893_V2_HAL) += -I$(srctree)/drivers/power/supply
+ccflags-$(CONFIG_OPLUS_CHARGER_MTK6893_V2_HAL) += -I$(srctree)/drivers/power/supply/mediatek/charger
+ccflags-$(CONFIG_OPLUS_CHARGER_MTK6893_V2_HAL) += -I$(srctree)/drivers/base/kernelFwUpdate
 endif
 
 oplus_chg_v2-y += gauge_ic/oplus_hal_bq27541.o
+oplus_chg_v2-$(CONFIG_OPLUS_MTK_FG_GAUGE_HAL) += gauge_ic/oplus_hal_mtk_fg.o
 
 oplus_chg_v2-y += vooc_ic/oplus_hal_rk826.o
+oplus_chg_v2-$(CONFIG_OPLUS_VOOC_RT5125_HAL) += vooc_ic/oplus_hal_rt5125.o
 oplus_chg_v2-y += vooc_ic/oplus_hal_op10.o
 
 oplus_chg_v2-y += hal/oplus_chg_ic.o
@@ -52,6 +63,8 @@ oplus_chg_v2-$(CONFIG_OPLUS_MP2762_CHARGER) += charger_ic/oplus_hal_mp2650.o
 oplus_chg_v2-$(CONFIG_OPLUS_SGM41512_CHARGER) += charger_ic/oplus_hal_sgm41512.o
 oplus_chg_v2-$(CONFIG_OPLUS_PD_MANAGER_CHARGER) += charger_ic/oplus_hal_pd_manager.o
 oplus_chg_v2-$(CONFIG_OPLUS_CHARGER_MTK6895S) += charger_ic/oplus_hal_mtk6895S.o
+oplus_chg_v2-$(CONFIG_OPLUS_CHARGER_MTK6893_V2_HAL) += charger_ic/oplus_hal_mtk6893.o
+oplus_chg_v2-$(CONFIG_OPLUS_CHARGER_MTK6893_V2_HAL) += charger_ic/oplus_mtk_compat.o
 oplus_chg_v2-$(CONFIG_OPLUS_MT6375_CHARGER) += charger_ic/oplus_hal_mt6375.o
 
 KBUILD_LDS_MODULE_ATTACH = oplus_chg_module.lds

@@ -8,9 +8,30 @@
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/device.h>
-#include <soc/oplus/system/boot_mode.h>
 #ifdef CONFIG_OPLUS_CHARGER_MTK
+/* NOTE: <soc/oplus/system/boot_mode.h> is intentionally NOT included here:
+ * its `extern int get_boot_mode(void)' conflicts with mtk_boot_common.h's
+ * `extern enum boot_mode_t get_boot_mode(void)'. The MTK header provides
+ * the declaration plus the META/FACTORY/ADVMETA/ATE/KERNEL_POWER_OFF_
+ * CHARGING constants used below. The MSM_* constants (QCOM code path,
+ * parsed but compiled out on MTK) are repeated from the Oplus header. */
 #include <mtk_boot_common.h>
+enum {
+	MSM_BOOT_MODE__NORMAL,
+	MSM_BOOT_MODE__FASTBOOT,
+	MSM_BOOT_MODE__RECOVERY,
+	MSM_BOOT_MODE__FACTORY,
+	MSM_BOOT_MODE__RF,
+	MSM_BOOT_MODE__WLAN,
+	MSM_BOOT_MODE__MOS,
+	MSM_BOOT_MODE__CHARGE,
+	MSM_BOOT_MODE__SILENCE,
+	MSM_BOOT_MODE__SAU,
+	MSM_BOOT_MODE__AGING = 998,
+	MSM_BOOT_MODE__SAFE = 999,
+};
+#else
+#include <soc/oplus/system/boot_mode.h>
 #endif
 
 #include <oplus_chg_module.h>
@@ -160,7 +181,9 @@ static int __init oplus_chg_class_init(void)
 	}
 #endif /* MODULE */
 
+#ifdef MODULE
 end:
+#endif
 	return 0;
 
 #ifdef MODULE

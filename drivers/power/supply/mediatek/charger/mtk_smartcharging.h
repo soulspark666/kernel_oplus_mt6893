@@ -104,6 +104,10 @@ struct smartcharging {
 };
 
 extern int wakeup_sc_algo_cmd(struct scd_cmd_param_t_1 *data, int subcmd, int para1);
+/* NOTE: struct charger_manager has no definition in this tree; forward
+ * declare it so clang -Wvisibility (on for Oplus v2) accepts the refs. */
+struct charger_manager;
+struct charger_data;
 extern void sc_update(struct charger_manager *pinfo);
 extern void sc_select_charging_current(struct charger_manager *info, struct charger_data *pdata);
 

@@ -23,11 +23,6 @@ struct ic_devres {
 
 static DEFINE_MUTEX(list_lock);
 static LIST_HEAD(ic_list);
-#ifdef CONFIG_OPLUS_CHG_IC_DEBUG
-static DEFINE_IDA(oplus_chg_ic_ida);
-#define OPLUS_CHG_IC_MAX 256
-static struct class *oplus_chg_ic_class;
-static dev_t oplus_chg_ic_devno;
 
 static const char * const err_type_text[] = {
 	[OPLUS_IC_ERR_UNKNOWN]		= "Unknown",
@@ -40,6 +35,11 @@ static const char * const err_type_text[] = {
 	[OPLUS_IC_ERR_CP]		= "ChargePump",
 	[OPLUS_IC_ERR_CC_LOGIC]		= "CCLogic",
 };
+#ifdef CONFIG_OPLUS_CHG_IC_DEBUG
+static DEFINE_IDA(oplus_chg_ic_ida);
+#define OPLUS_CHG_IC_MAX 256
+static struct class *oplus_chg_ic_class;
+static dev_t oplus_chg_ic_devno;
 
 int oplus_chg_ic_get_new_minor(void)
 {
@@ -704,8 +704,9 @@ int oplus_chg_ic_move_err_msg(struct oplus_chg_ic_dev *dest,
 	spin_lock(&dest->err_list_lock);
 	spin_lock(&src->err_list_lock);
 	if (!list_empty(&src->err_list))
-		list_bulk_move_tail(&dest->err_list, src->err_list.next,
-				    src->err_list.prev);
+		/* list_bulk_move_tail() does not exist on this kernel;
+		 * full-list splice to dest tail is equivalent here. */
+		list_splice_tail_init(&src->err_list, &dest->err_list);
 	spin_unlock(&src->err_list_lock);
 	spin_unlock(&dest->err_list_lock);
 

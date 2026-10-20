@@ -1012,10 +1012,19 @@ static int typec_init(struct pd_manager_chip *chip)
 {
 	int ret = 0;
 
-	chip->typec_caps.type = TYPEC_PORT_DRP;
+	/* This board's USB-C port is a permanent sink: the bootloader DT says
+	 * role_def = "SNK Only". Advertising TYPEC_PORT_DRP let the role
+	 * callbacks drive the TCPC into TYPEC_ROLE_DRP at boot (dmesg
+	 * "typec_new_role: DRP" ~19s), and a DRP facing an A-plug wall brick
+	 * presents Rp itself and resolves to SRC/Try.SRC instead of
+	 * TYPEC_ATTACHED_SNK. With no SNK attach there is no BC1.2 result, so
+	 * usbid_evt never fires, EXTCON_USB never rises and Android never
+	 * brings up the adb gadget. Pin the port to sink-only. */
+	chip->typec_caps.type = TYPEC_PORT_SNK;
 	chip->typec_caps.data = TYPEC_PORT_DRD;
 	chip->typec_caps.revision = 0x0120;
 	chip->typec_caps.pd_revision = 0x0300;
+	chip->typec_caps.prefer_role = TYPEC_SINK;
 	switch (chip->tcpc->desc.role_def) {
 	case TYPEC_ROLE_SRC:
 	case TYPEC_ROLE_TRY_SRC:
@@ -1029,6 +1038,9 @@ static int typec_init(struct pd_manager_chip *chip)
 		chip->typec_caps.prefer_role = TYPEC_NO_PREFERRED_ROLE;
 		break;
 	}
+	/* Keep it a sink regardless of the role_def string: the "no preferred
+	 * role" case above is exactly what resolved to DRP at boot. */
+	chip->typec_caps.prefer_role = TYPEC_SINK;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
 	chip->typec_caps.driver_data = chip;
 	chip->typec_caps.ops = &tcpc_typec_ops;

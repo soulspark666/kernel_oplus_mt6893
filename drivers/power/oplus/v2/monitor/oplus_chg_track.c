@@ -3550,15 +3550,20 @@ oplus_chg_track_get_charger_type(struct oplus_monitor *monitor,
 	return 0;
 }
 
-static int oplus_chg_track_obtain_power_info(char *power_info, int len)
+static noinline int oplus_chg_track_obtain_power_info(char *power_info, int len)
 {
 	int index = 0;
-	struct oplus_chg_track_status temp_track_status;
-	struct oplus_chg_track_status *track_status = &temp_track_status;
+	/* NOTE: struct oplus_chg_track_status is ~3.8KB; keep it off the
+	 * stack (FRAME_WARN=3600) by allocating it. */
+	struct oplus_chg_track_status *track_status;
 	struct oplus_monitor *monitor;
 
 	if (!power_info || !g_track_chip)
 		return -1;
+
+	track_status = kzalloc(sizeof(*track_status), GFP_KERNEL);
+	if (!track_status)
+		return -ENOMEM;
 
 	monitor = g_track_chip->monitor;
 	oplus_chg_track_get_charger_type(monitor, track_status,
@@ -3605,6 +3610,7 @@ static int oplus_chg_track_obtain_power_info(char *power_info, int len)
 	index += snprintf(&(power_info[index]), len - index, "$$batt_curr@@%d",
 			  monitor->ibat_ma);
 
+	kfree(track_status);
 	return 0;
 }
 
@@ -3656,7 +3662,7 @@ oplus_chg_track_get_plat_pmic_err_comm_info(struct oplus_chg_track *track,
 	return index;
 }
 
-static int oplus_chg_track_upload_ic_err_info(struct oplus_chg_track *track)
+static noinline int oplus_chg_track_upload_ic_err_info(struct oplus_chg_track *track)
 {
 	union mms_msg_data data = { 0 };
 	int index;
@@ -3744,7 +3750,7 @@ static int oplus_chg_track_upload_ic_err_info(struct oplus_chg_track *track)
 	return 0;
 }
 
-static int oplus_chg_track_upload_usbtemp_info(struct oplus_chg_track *track)
+static noinline int oplus_chg_track_upload_usbtemp_info(struct oplus_chg_track *track)
 {
 	union mms_msg_data data = { 0 };
 	int index;
@@ -3768,7 +3774,7 @@ static int oplus_chg_track_upload_usbtemp_info(struct oplus_chg_track *track)
 	return 0;
 }
 
-static int
+static noinline int
 oplus_chg_track_upload_vbatt_too_low_info(struct oplus_chg_track *track)
 {
 	union mms_msg_data data = { 0 };
@@ -3789,7 +3795,7 @@ oplus_chg_track_upload_vbatt_too_low_info(struct oplus_chg_track *track)
 	return 0;
 }
 
-static int
+static noinline int
 oplus_chg_track_upload_vbatt_diff_over_info(struct oplus_chg_track *track)
 {
 	struct oplus_monitor *monitor = track->monitor;
@@ -3827,7 +3833,7 @@ int oplus_chg_track_charge_full(struct oplus_monitor *monitor)
 	return 0;
 }
 
-static int
+static noinline int
 oplus_chg_track_upload_uisoc_keep_1_t_info(struct oplus_chg_track *chip)
 {
 	struct oplus_monitor *monitor = chip->monitor;

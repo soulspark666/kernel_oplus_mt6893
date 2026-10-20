@@ -1,0 +1,585 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * MT6893 21127 (Cupida/RMX3031) v2 charger framework device tree.
+ *
+ * WP-A of V2_CHARGER_PORT_PLAN, REVISED against PRODUCTION DT captured from
+ * /proc/device-tree on the device (the in-tree v1 DTSI is STALE: it says
+ * rk826@0a/dual-cell/GPIO163 while production is rt5125@0e/single-cell).
+ * Every value below comes from the live tree unless marked TODO(WP-E).
+ *
+ * Production facts (live): rt5125-fastcg@0e on i2c7, single 4400mV cell
+ * (vbatt_num=1), vooc_project=4, SVOOC single-batt protocol, platform
+ * (MTK) gauge (NO bq27541 anywhere), bq2597x pump @0x65 (no v2 pump HAL
+ * yet — SVOOC current gated until it lands; DCP/PD path unaffected),
+ * NO mp2650 (i2c11 empty), NO ctr1/switch_ctrl GPIO, asic_id pio 56,
+ * ship pio 126, NO ccdetect GPIO.
+ *
+ * TEMP_REGION gear order (v2/include/oplus_chg_comm.h:23-31):
+ *   COLD LITTLE_COLD COOL LITTLE_COOL PRE_NORMAL NORMAL WARM HOT.
+ * Live zones: removed 190, cold 20, little_cold 0, cool 50,
+ * little_cool 120, normal 160, warm 450, hot 530. PRE_NORMAL := NORMAL
+ * (no v1 source; WP-E to tune on device).
+ * Strategy rows are (cool_temp, heat_temp, curr, heat_next, cool_next)
+ * per strategy/oplus_strategy_cgcl.c:22-29.
+ */
+#include "oplus_chg.h"
+
+/* v2 ASIC pinctrl — production GPIOs (live qcom,*-gpio; phandle 72 = &pio):
+ * switch1 191, reset 189, clock 95, data 94, asic_id 56. No ctr1 exists. */
+&pio {
+	v2_asic_switch_normal: v2_asic_switch_normal {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO191__FUNC_GPIO191>;
+			slew-rate = <1>;
+			bias-pull-down;
+			output-low;
+		};
+	};
+
+	v2_asic_switch_vooc: v2_asic_switch_vooc {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO191__FUNC_GPIO191>;
+			slew-rate = <1>;
+			bias-pull-up;
+			output-high;
+		};
+	};
+
+	v2_asic_reset_active: v2_asic_reset_active {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO189__FUNC_GPIO189>;
+			slew-rate = <1>;
+			bias-pull-down;
+		};
+	};
+
+	v2_asic_reset_sleep: v2_asic_reset_sleep {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO189__FUNC_GPIO189>;
+			slew-rate = <1>;
+			bias-pull-up;
+		};
+	};
+
+	v2_asic_clock_active: v2_asic_clock_active {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO95__FUNC_GPIO95>;
+			slew-rate = <0>;
+			bias-pull-up;
+		};
+	};
+
+	v2_asic_clock_sleep: v2_asic_clock_sleep {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO95__FUNC_GPIO95>;
+			slew-rate = <0>;
+			bias-pull-down;
+		};
+	};
+
+	v2_asic_data_active: v2_asic_data_active {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO94__FUNC_GPIO94>;
+			slew-rate = <0>;
+			bias-pull-down;
+		};
+	};
+
+	v2_asic_data_sleep: v2_asic_data_sleep {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO94__FUNC_GPIO94>;
+			slew-rate = <0>;
+			bias-pull-down;
+		};
+	};
+
+	/* ASIC-ID strapping (live qcom,vooc_asic_id-gpio = pio 56) */
+	v2_asic_id_active: v2_asic_id_active {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO56__FUNC_GPIO56>;
+			input-enable;
+			slew-rate = <0>;
+			bias-pull-up;
+		};
+	};
+
+	v2_asic_id_sleep: v2_asic_id_sleep {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO56__FUNC_GPIO56>;
+			input-enable;
+			slew-rate = <0>;
+			bias-pull-down;
+		};
+	};
+
+	/* ship (live qcom,ship-gpio = pio 126) */
+	v2_ship_active: v2_ship_active {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO126__FUNC_GPIO126>;
+			slew-rate = <1>;
+			output-high;
+		};
+	};
+
+	v2_ship_sleep: v2_ship_sleep {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO126__FUNC_GPIO126>;
+			slew-rate = <1>;
+			output-low;
+		};
+	};
+};
+
+/* NOTE: the groups must live on an EXISTING base-dtb node. This board's
+ * base dtb has no /soc node, so &soc produces an unresolvable fixup and the
+ * bootloader rejects the whole dtbo. Anchor under &charger (present). */
+&charger {
+	oplus_chg_core {
+		oplus,chg_framework_v2;
+		oplus,smart_charging_screenoff;
+
+		oplus-charger {
+			mtk_6893_groups: oplus,mtk_6893-groups {
+				functions = <
+					OPLUS_IC_FUNC_INIT
+					OPLUS_IC_FUNC_EXIT
+					OPLUS_IC_FUNC_REG_DUMP
+					OPLUS_IC_FUNC_SMT_TEST
+					OPLUS_IC_FUNC_BUCK_INPUT_PRESENT
+					OPLUS_IC_FUNC_BUCK_INPUT_SUSPEND
+					OPLUS_IC_FUNC_BUCK_INPUT_IS_SUSPEND
+					OPLUS_IC_FUNC_BUCK_OUTPUT_SUSPEND
+					OPLUS_IC_FUNC_BUCK_OUTPUT_IS_SUSPEND
+					OPLUS_IC_FUNC_BUCK_SET_ICL
+					OPLUS_IC_FUNC_BUCK_GET_ICL
+					OPLUS_IC_FUNC_BUCK_SET_FCC
+					OPLUS_IC_FUNC_BUCK_SET_FV
+					OPLUS_IC_FUNC_BUCK_SET_ITERM
+					OPLUS_IC_FUNC_BUCK_SET_RECHG_VOL
+					OPLUS_IC_FUNC_BUCK_GET_INPUT_CURR
+					OPLUS_IC_FUNC_BUCK_GET_INPUT_VOL
+					OPLUS_IC_FUNC_BUCK_AICL_ENABLE
+					OPLUS_IC_FUNC_BUCK_AICL_RERUN
+					OPLUS_IC_FUNC_BUCK_AICL_RESET
+					OPLUS_IC_FUNC_BUCK_GET_CC_ORIENTATION
+					OPLUS_IC_FUNC_BUCK_GET_HW_DETECT
+					OPLUS_IC_FUNC_BUCK_GET_CHARGER_TYPE
+					OPLUS_IC_FUNC_BUCK_RERUN_BC12
+					OPLUS_IC_FUNC_BUCK_QC_DETECT_ENABLE
+					OPLUS_IC_FUNC_BUCK_SHIPMODE_ENABLE
+					OPLUS_IC_FUNC_BUCK_SET_QC_CONFIG
+					OPLUS_IC_FUNC_BUCK_SET_PD_CONFIG
+					OPLUS_IC_FUNC_BUCK_WDT_ENABLE
+					OPLUS_IC_FUNC_BUCK_KICK_WDT
+					OPLUS_IC_FUNC_BUCK_SET_AICL_POINT
+					OPLUS_IC_FUNC_BUCK_SET_VINDPM
+					OPLUS_IC_FUNC_BUCK_HARDWARE_INIT
+					OPLUS_IC_FUNC_OTG_BOOST_ENABLE
+					OPLUS_IC_FUNC_SET_OTG_BOOST_VOL
+					OPLUS_IC_FUNC_SET_OTG_BOOST_CURR_LIMIT
+					OPLUS_IC_FUNC_BUCK_GET_VBUS_COLLAPSE_STATUS
+					OPLUS_IC_FUNC_GET_SHUTDOWN_SOC
+					OPLUS_IC_FUNC_BACKUP_SOC
+					OPLUS_IC_FUNC_GET_TYPEC_MODE
+					OPLUS_IC_FUNC_SET_TYPEC_MODE
+					OPLUS_IC_FUNC_SET_OTG_SWITCH_STATUS
+					OPLUS_IC_FUNC_GET_OTG_SWITCH_STATUS
+					OPLUS_IC_FUNC_GET_OTG_ENABLE
+					OPLUS_IC_FUNC_SET_USB_DISCHG_ENABLE
+					OPLUS_IC_FUNC_IS_OPLUS_SVID
+				>;
+				virqs = <
+					OPLUS_IC_VIRQ_ERR
+					OPLUS_IC_VIRQ_CC_DETECT
+					OPLUS_IC_VIRQ_PLUGIN
+					OPLUS_IC_VIRQ_CC_CHANGED
+					OPLUS_IC_VIRQ_CHG_TYPE_CHANGE
+					OPLUS_IC_VIRQ_OTG_ENABLE
+					OPLUS_IC_VIRQ_SVID
+				>;
+			};
+		};
+
+		oplus-gauge {
+			mtk_fg_groups: oplus,mtk_fg_groups {
+				functions = <
+					OPLUS_IC_FUNC_INIT
+					OPLUS_IC_FUNC_EXIT
+					OPLUS_IC_FUNC_REG_DUMP
+					OPLUS_IC_FUNC_SMT_TEST
+					OPLUS_IC_FUNC_GAUGE_GET_BATT_VOL
+					OPLUS_IC_FUNC_GAUGE_GET_BATT_MAX
+					OPLUS_IC_FUNC_GAUGE_GET_BATT_MIN
+					OPLUS_IC_FUNC_GAUGE_GET_BATT_CURR
+					OPLUS_IC_FUNC_GAUGE_GET_BATT_TEMP
+					OPLUS_IC_FUNC_GAUGE_GET_BATT_SOC
+					OPLUS_IC_FUNC_GAUGE_GET_BATT_FCC
+					OPLUS_IC_FUNC_GAUGE_GET_BATT_CC
+					OPLUS_IC_FUNC_GAUGE_GET_BATT_RM
+					OPLUS_IC_FUNC_GAUGE_GET_BATT_SOH
+					OPLUS_IC_FUNC_GAUGE_GET_BATT_EXIST
+					OPLUS_IC_FUNC_GAUGE_GET_BATT_NUM
+				>;
+				virqs = <
+					OPLUS_IC_VIRQ_ERR
+					OPLUS_IC_VIRQ_OFFLINE
+					OPLUS_IC_VIRQ_RESUME
+				>;
+			};
+		};
+	};
+};
+
+/* main buck: MT6360 via SoC `charger` node. usb-temp channel names match the
+ * v2 virtual_buck driver ("usb_temp_adc_l/r"). Charger-ID + discharge GPIOs
+ * from live tree (192/51). ccdetect: no live GPIO, omitted (driver-tolerated).
+ * pinctrl for chargerid/dischg comes from the merged v1 file. */
+&charger {
+	io-channels = <&auxadc 4>,
+		      <&auxadc 5>;
+	io-channel-names = "usb_temp_adc_l",
+			   "usb_temp_adc_r";
+
+	oplus,support_ntc_01c_precision;
+
+	oplus,chargerid_switch-gpio = <&pio 192 0x00>;
+	oplus,dischg-gpio = <&pio 51 0x00>;
+
+	oplus,ic_type = <OPLUS_CHG_IC_BUCK>;
+	oplus,ic_index = <0>;
+};
+
+/* ASIC on i2c7 (live: rt5125-fastcg@0e, compatible oplus,rt5125-fastcg).
+ * Same unit address merges with NOTHING (stale v1 file has rk826@0a, a
+ * different node — both-included builds keep both nodes; only this one
+ * matches the new HAL, the stale one matches no v2 driver and stays
+ * inert... see note below).
+ * Spec values from live tree; middle temp bands have no live ASIC source
+ * (driver defaults apply). */
+&i2c7 {
+	rt5125_fastcg: rt5125_fastcg@0e {
+		status = "okay";
+		compatible = "oplus,rt5125-fastcg";
+		reg = <0x0e 0>;
+		oplus,ic_type = <OPLUS_CHG_IC_ASIC>;
+		oplus,ic_index = <0>;
+
+		oplus,vooc-version = <VOOC_VERSION_5_0>; /* TODO(WP-E): no live source; stale-tree value */
+		oplus,vooc_fw_update_newmethod;
+
+		oplus_spec,vooc_low_temp = <0>;
+		oplus_spec,vooc_high_temp = <430>;
+		oplus_spec,vooc_over_high_temp = <440>;
+		oplus_spec,vooc_low_soc = <1>;
+		oplus_spec,vooc_high_soc = <90>;
+		oplus_spec,vooc_warm_vol_thr = <3350>;
+		oplus_spec,vooc_warm_soc_thr = <50>; /* TODO(WP-E): no live source */
+		oplus_spec,vooc_bad_volt = <3650 3550 3450 3350>;
+		oplus_spec,vooc_bad_volt_suspend = <3650 3550 3450 3350>;
+	};
+};
+
+/* NOTE on the stale rk826_fastcg@0a node (in-tree v1 DTSI): with both files
+ * included it stays in the overlay but matches no driver (v1 unbuilt, v2
+ * rt5125 HAL matches only oplus,rt5125-fastcg, rk826 HAL matches only
+ * oplus,rk826-fastcg which is absent). Inert. The dtbo entry the bootloader
+ * consumes for this board comes from the stock dtbo (production nodes). */
+
+/* Stale-tree nodes, absent on production hardware: disable so that no
+ * driver (v2 rk826/bq27541 HALs are built-in) wastes probe time on empty
+ * addresses. Harmless in v2-only builds (creates inert disabled nodes). */
+&i2c7 {
+	rk826_fastcg@0a {
+		status = "disabled";
+	};
+	bq27541-battery@55 {
+		status = "disabled";
+	};
+};
+
+&i2c11 {
+	mp2650-charger@5c {
+		status = "disabled";
+	};
+	charge_pump-divider@68 {
+		status = "disabled";
+	};
+};
+
+/* Device-needing containers live under &odm (simple-bus): /charger is
+ * not simple-bus, so children hung there never become platform devices
+ * and no v2 leaf driver binds. Hardware props stay on &charger. */
+&odm {
+	oplus_mms_wired: oplus,mms_wired {
+		compatible = "oplus,mms_wired";
+		oplus,buck_ic = <&oplus_virtual_buck>;
+
+		oplus,usbtemp_batttemp_gap = <10>; /* live */
+		oplus,adc_info_name = "21127";
+
+		oplus_virtual_buck: oplus,virtual_buck {
+			compatible = "oplus,virtual_buck";
+			/* single buck: live i2c11 is EMPTY (no mp2650) */
+			oplus,buck_ic = <&charger>;
+			oplus,buck_ic_index = <0>;
+			oplus,buck_ic_current_ratio = <0>;
+			oplus,buck_ic_connect = <OPLUS_CHG_IC_CONNECT_PARALLEL>;
+			oplus,main_charger = <1>;
+			oplus,buck_ic_func_group = <&mtk_6893_groups>;
+
+			oplus,ic_type = <OPLUS_CHG_IC_VIRTUAL_BUCK>;
+			oplus,ic_index = <0>;
+
+			oplus,ship-gpio = <&pio 126 0x00>; /* live */
+
+			pinctrl-names = "ship_active", "ship_sleep";
+			pinctrl-0 = <&v2_ship_active>;
+			pinctrl-1 = <&v2_ship_sleep>;
+
+			io-channels = <&auxadc 4>,
+				      <&auxadc 5>;
+			io-channel-names = "usb_temp_adc_l", "usb_temp_adc_r";
+		};
+	};
+
+	oplus_mms_gauge: oplus,mms_gauge {
+		compatible = "oplus,mms_gauge";
+		oplus,gauge_ic = <&oplus_virtual_gauge>;
+		oplus,topic-update-interval = <10000>;
+
+		oplus_virtual_gauge: oplus,virtual_gauge {
+			compatible = "oplus,virtual_gauge";
+			oplus,gauge_ic = <&oplus_mtk_fg>;
+			oplus,gauge_ic_index = <0>;
+			oplus,gauge_ic_func_group = <&mtk_fg_groups>;
+			oplus,batt_capacity_mah = <4500>; /* live */
+			oplus,ic_type = <OPLUS_CHG_IC_VIRTUAL_GAUGE>;
+			oplus,ic_index = <0>;
+		};
+	};
+};
+
+&odm {
+	oplus_chg_wired: oplus,wired {
+		compatible = "oplus,wired";
+
+		oplus,vooc-support;
+
+		/* Gear order: COLD LITTLE_COLD COOL LITTLE_COOL PRE_NORMAL
+		 * NORMAL WARM HOT. Normal-path currents from live
+		 * temp_*_fastchg_current_ma (cold 300, little_cold 1076,
+		 * cool/little_cool/normal 2200, warm 1152); PD/QC from live
+		 * pd/qc_temp_* (cool/little_cool/normal 3300,
+		 * little_cold-high 2594, warm 1152; COLD := 2594, nearest
+		 * defined colder-zone value); SDP 500 (live usb input);
+		 * CDP 1500 (live cdp input). HOT=0. */
+		oplus_spec,vbatt_pdqc_to_5v_thr = <4500>; /* live */
+		oplus_spec,vbatt_pdqc_to_9v_thr = <4500>; /* live */
+		oplus_spec,pd-iclmax-ma = <1500>; /* live pd input */
+		oplus_spec,qc-iclmax-ma = <1500>; /* live qc input */
+		oplus_spec,non-standard-ibatmax-ma = <512>; /* live */
+		oplus_spec,input-power-mw = <
+			2500		/* UNKNOWN */
+			2500		/* SDP (500mA*5V) */
+			7500		/* CDP (1500mA*5V) */
+			10000		/* DCP (2000mA*5V) */
+			65000		/* VOOC pump path (65W SVOOC) */
+			13500		/* QC (1500mA*9V) */
+			13500		/* PD (1500mA*9V) */
+		>;
+		oplus_spec,led_on-fccmax-ma = <0 1076 1200 1200 1200 2000 1500 0>;
+		/* live led bands (high 1200, normal 2000, warm 1500);
+		 * COLD=0 screen-on is conservative. WP-E to tune. */
+		oplus_spec,fccmax-ma-lv = <
+			0 300 1076 2200 2200 2200 1152 0	/* UNKNOWN */
+			0 500 500  500  500  500  500  0	/* SDP */
+			0 500 1500 1500 1500 1500 1150 0	/* CDP */
+			0 300 1076 2200 2200 2200 1152 0	/* DCP */
+			0 300 1076 2200 2200 3300 1152 0	/* VOOC (NORMAL cap; TODO WP-E) */
+			0 2594 2594 3300 3300 3300 1152 0	/* QC */
+			0 2594 2594 3300 3300 3300 1152 0	/* PD */
+		>;
+		/* HV gear: no live lv/hv split on normal path (taper via
+		 * wired-ffc-*); HV := LV replicates v1. WP-E to tune. */
+		oplus_spec,fccmax-ma-hv = <
+			0 300 1076 2200 2200 2200 1152 0	/* UNKNOWN */
+			0 500 500  500  500  500  500  0	/* SDP */
+			0 500 1500 1500 1500 1500 1150 0	/* CDP */
+			0 300 1076 2200 2200 2200 1152 0	/* DCP */
+			0 300 1076 2200 2200 3300 1152 0	/* VOOC */
+			0 2594 2594 3300 3300 3300 1152 0	/* QC */
+			0 2594 2594 3300 3300 3300 1152 0	/* PD */
+		>;
+
+		/* TODO(WP-E): no live source; safe cool-down policy. */
+		oplus_spec,cool_down_pdqc_vol_mv = <9000 9000 9000>;
+		oplus_spec,cool_down_pdqc_curr_ma = <1200 1500 2000>;
+		oplus_spec,cool_down_vooc_curr_ma = <1200 1500 2000 2500 3000 3600>;
+		oplus_spec,cool_down_normal_curr_ma = <1200 1500 2000>;
+
+		oplus_spec,vbus_ov_thr_mv = <11000 11000>; /* live charger_hv_thr */
+		oplus_spec,vbus_uv_thr_mv = <3400 3400>; /* live charger_lv_thr */
+
+		/* Wired VOOC strategy from live strategy1 (temps decidegc,
+		 * 7-bit levels 9=5A 7=4A 5=3A 3=2A -> mA here). */
+		oplus,vooc_strategy_name = "cgcl";
+		oplus,vooc_strategy_data = <OPLUS_STRATEGY_USE_BATT_TEMP
+					    375 385 5000 1 0
+					    385 410 4000 2 0
+					    410 420 3000 2 1>;
+	};
+
+	oplus_chg_comm: oplus,comm {
+		compatible = "oplus,common-charge";
+		/* Boundaries from live *_bat_decidegc (cold 20, little_cold 0,
+		 * cool 50, little_cool 120, normal 160, warm 450, hot 530).
+		 * First cell (cold-lo): live cold=20. TODO(WP-E) confirm. */
+		oplus_spec,batt-them-thr = <20 0 50 120 160 450 530>;
+		oplus_spec,iterm-ma = <225>; /* live default_iterm_ma */
+		/* Float tables: 8 cells, same gear order. Live vfloat
+		 * (cold 3980, little_cold/cool/little_cool/normal 4435,
+		 * warm 4130; HOT := warm, capped low if ever used). */
+		oplus_spec,fv-mv = <3980 4435 4435 4435 4435 4435 4130 4130>;
+		oplus_spec,sw-fv-mv = <3930 4385 4385 4385 4385 4385 4080 4080>;
+		oplus_spec,hw-fv-inc-mv = <18 18 18 18 18 18 18 18>;
+		oplus_spec,sw-over-fv-mv = <3990 4445 4445 4445 4445 4445 4140 4140>;
+		oplus_spec,sw-over-fv-dec-mv = <8>; /* live vfloat_step_mv */
+		oplus_spec,non-standard-sw-fv-mv = <3930>; /* live */
+		oplus_spec,non-standard-fv-mv = <3980>; /* live */
+		oplus_spec,non-standard-hw-fv-inc-mv = <18>; /* live */
+		oplus_spec,non-standard-sw-over-fv-mv = <3990>; /* live */
+		oplus_spec,non-standard-vbatdet-mv = <3600>; /* TODO(WP-E) */
+		oplus_spec,wired-vbatdet-mv = <4165 4265 4365 4365 4365 4365 4030 0>; /* TODO(WP-E) */
+		oplus_spec,wls-vbatdet-mv = <0 3675 4235 4370 4370 4370 4030 0>; /* TODO(WP-E) */
+		oplus_spec,fcc-gear-thr-mv = <4180>; /* TODO(WP-E) */
+		oplus_spec,vbatt-ov-thr-mv = <4550>; /* live vbatt_hv_thr */
+		/* FFC from live (ff1 1500/1750, ffc2 1500/1750, bands
+		 * 160/350/400, fv 4550, sw 4485, over 4500, exit 150).
+		 * Cutoffs: no live source. TODO(WP-E). */
+		oplus_spec,ffc-temp-thr = <160 350 400>;
+		oplus_spec,wired-ffc-step-max = <2>;
+		oplus_spec,wired-ffc-fv-mv = <4550 4550>;
+		oplus_spec,wired-ffc-fv-cutoff-mv = <4470 4460>;
+		oplus_spec,wired-ffc-fcc-ma = <1500 1500
+					       1500 1500>;
+		oplus_spec,wired-ffc-fcc-cutoff-ma = <400 400
+						      200 200>;
+		oplus_spec,wls-ffc-step-max = <2>;
+		oplus_spec,wls-ffc-fv-mv = <4550 4550>;
+		oplus_spec,wls-ffc-fv-cutoff-mv = <4445 4435>;
+		oplus_spec,wls-ffc-icl-ma = <800 800
+					     550  550>;
+		oplus_spec,wls-ffc-fcc-ma = <1500 1500
+					     1500 1500>;
+		oplus_spec,wls-ffc-fcc-cutoff-ma = <400 400
+						    200 200>;
+		/* (wls-ffc-*: no wireless on this board; shape only.) */
+		oplus_spec,vbat_uv_thr_mv = <3300>; /* live power_off */
+		oplus_spec,vbat_charging_uv_thr_mv = <3200>; /* TODO(WP-E) */
+
+		oplus,vooc_show_ui_soc_decimal; /* live */
+		oplus,ui_soc_decimal_speedmin = <20>; /* live */
+	};
+
+	oplus_mms_err: oplus,mms_err {
+		compatible = "oplus,mms_err";
+		oplus,topic-update-interval = <60000>;
+	};
+
+	oplus_vooc: oplus,vooc {
+		compatible = "oplus,vooc";
+		oplus,vooc_ic = <&oplus_virtual_asic>;
+
+		oplus_spec,vooc_soc_range = <50 75 85>;
+		oplus_spec,vooc_temp_range = <50 120 200 350 440>;
+		/* TODO(WP-E): temp_range has no live source (stale-derived). */
+
+		oplus,vooc_data_width = <7>; /* live reply_mcu_bits */
+		oplus,vooc_curr_max = <CURR_LIMIT_7BIT_5_0A>; /* live normal_current 0x09 */
+		oplus,support_vooc_by_normal_charger_path;
+		oplus,vooc_project = <4>; /* live */
+		/* NOTE: no abnormal_adapter / smart_bcc props: no live source
+		 * (drivers fall back safely). No BCC curves: no live source. */
+
+		/* General (pump) strategy from live strategy1 high side
+		 * (385/395/420 -> 0x07/0x05/0x03). */
+		oplus,general_strategy_name = "cgcl";
+		oplus,general_strategy_data = <OPLUS_STRATEGY_USE_BATT_TEMP
+						0   385 CURR_LIMIT_7BIT_7_5A 1 0
+						385 395 CURR_LIMIT_7BIT_5_0A 2 0
+						395 420 CURR_LIMIT_7BIT_4_0A 3 1
+						420 440 CURR_LIMIT_7BIT_3_0A 3 2>;
+
+		oplus_virtual_asic: oplus,virtual_asic {
+			compatible = "oplus,virtual_asic";
+			oplus,asic_ic = <&rt5125_fastcg>;
+
+			oplus,ic_type = <OPLUS_CHG_IC_VIRTUAL_ASIC>;
+			oplus,ic_index = <0>;
+
+			/* No switch_ctrl on production (single-switch). The
+			 * virtual_asic driver tolerates its absence. */
+			oplus,asic_switch1-gpio = <&pio 191 0x00>;
+			oplus,asic_reset-gpio = <&pio 189 0x00>;
+			oplus,asic_clock-gpio = <&pio 95 0x00>;
+			oplus,asic_data-gpio = <&pio 94 0x00>;
+			oplus,asic_id-gpio = <&pio 56 0x00>; /* live */
+
+			pinctrl-names = "asic_switch_normal", "asic_switch_vooc",
+					"asic_reset_active", "asic_reset_sleep",
+					"asic_clock_active", "asic_clock_sleep",
+					"asic_data_active", "asic_data_sleep",
+					"asic_id_active", "asic_id_sleep";
+			pinctrl-0 = <&v2_asic_switch_normal>;
+			pinctrl-1 = <&v2_asic_switch_vooc>;
+			pinctrl-2 = <&v2_asic_reset_active>;
+			pinctrl-3 = <&v2_asic_reset_sleep>;
+			pinctrl-4 = <&v2_asic_clock_active>;
+			pinctrl-5 = <&v2_asic_clock_sleep>;
+			pinctrl-6 = <&v2_asic_data_active>;
+			pinctrl-7 = <&v2_asic_data_sleep>;
+			pinctrl-8 = <&v2_asic_id_active>;
+			pinctrl-9 = <&v2_asic_id_sleep>;
+		};
+	};
+};
+
+/* MTK fuel-gauge front for virtual_gauge (production has no ext gauge).
+ * Served by gauge_ic/oplus_hal_mtk_fg.c via the "battery" power_supply. */
+&odm {
+	oplus_mtk_fg: oplus,mtk-fg {
+		compatible = "oplus,mtk-fg";
+		oplus,ic_type = <OPLUS_CHG_IC_GAUGE>;
+		oplus,ic_index = <0>;
+	};
+};
+
+#include "oplus-chg-21127-fw.dtsi"
+
+/* mtk-extcon-usb skips the "Type-C SINK plug in -> EXTCON_USB" branch
+ * whenever mediatek,bypss-typec-sink is set, on the assumption that the
+ * BC1.2 charger layer will call mt_usb_connect_v1() instead. That symbol is
+ * compiled out here (no ADAPT_PSY_V1), so nothing in the tree ever set
+ * EXTCON_USB: extcon0 stayed USB=0, the UDC stayed "not attached" and adb
+ * over USB never came up. Clearing the bypass lets TYPEC_ATTACHED_SNK drive
+ * EXTCON_USB directly. */
+&extcon_usb {
+	mediatek,bypss-typec-sink = <0>;
+};
+
+/* The MT6360 Type-C controller's alert line. The generic v1 dtsi leaves
+ * it at GPIO 24 -- but on MT6893 that is the MT6360 PMIC's own interrupt
+ * pin (mt6360,intr_gpio_num = <24> on &mt6360_pmu), not the TCPC's.
+ * The MT6893 product DTS uses GPIO 25 for the TCPC:
+ *	&mt6360_typec { mt6360pd,intr_gpio_num = <25>;
+ *			 mt6360pd,intr_gpio = <&pio 25 0x0>; };
+ *
+ * With the wrong pin the TCPC never sees an alert: usbid_evt/CC changes
+ * never arrive, BC1.2 never runs, EXTCON_USB never rises and the adb
+ * gadget never binds -- the phone never appears on a PC. */
+&mt6360_typec {
+	mt6360pd,intr_gpio_num = <25>;
+	mt6360pd,intr_gpio = <&pio 25 0x0>;
+};
+
+/* charge end */

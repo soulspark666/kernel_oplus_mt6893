@@ -37,3 +37,33 @@ config OPLUS_MT6375_CHARGER
 	bool "MT6375 debug support"
 	help
 	  Say Y here to declare MT6375 debug support
+
+config OPLUS_CHARGER_MTK6893_V2_HAL
+	bool "MT6893 charger HAL (v2)"
+	depends on OPLUS_CHG_V2 && OPLUS_CHARGER_MTK6893
+	default y if OPLUS_CHARGER_MTK6893
+	help
+	  Say Y here to build the MT6893 (MT6360 PMIC) buck HAL for the
+	  v2 charger framework (Cupida/RMX3031). It binds the
+	  driverless "mediatek,charger" node (the stock mtk_charger.o is
+	  already excluded by the OPLUS branch, so there is no probe
+	  race); the charger_class/adapter_class/alg support objects
+	  still come from the MTK charger tree as in v1 builds.
+
+config OPLUS_VOOC_RT5125_HAL
+	bool "RT5125 VOOC ASIC HAL (v2)"
+	depends on OPLUS_CHARGER_MTK6893_V2_HAL
+	default y if OPLUS_CHARGER_MTK6893_V2_HAL
+	help
+	  Say Y here to build the RT5125 VOOC firmware HAL for the v2
+	  charger framework (Cupida/RMX3031).
+
+config OPLUS_MTK_FG_GAUGE_HAL
+	bool "MTK fuel-gauge HAL (v2)"
+	depends on OPLUS_CHARGER_MTK6893_V2_HAL
+	default y if OPLUS_CHARGER_MTK6893_V2_HAL
+	help
+	  Say Y here to build the MTK fuel-gauge front HAL for the v2
+	  charger framework. Needed on boards without an external gauge
+	  (Cupida/RMX3031 uses the MTK gauge via the "battery"
+	  power_supply).

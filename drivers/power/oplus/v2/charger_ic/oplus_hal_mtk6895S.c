@@ -3830,7 +3830,14 @@ int chg_alg_event(struct notifier_block *notifier,
 static void mtk_tcpc_set_otg_enable(struct oplus_chg_ic_dev *ic_dev, bool en)
 {
 	struct mtk_charger *chip;
+
+	/* TCPC notifier is registered before the v2 ic_dev exists; early
+	 * SOURCE_VBUS events must not deref a NULL ic_dev (was: boot panic). */
+	if (!ic_dev)
+		return;
 	chip = oplus_chg_ic_get_drvdata(ic_dev);
+	if (!chip)
+		return;
 
 	if (chip->otg_enable == en)
 		return;
@@ -3882,6 +3889,11 @@ static int pd_tcp_notifier_call(struct notifier_block *pnb,
 	int ret = 0;
 
 	pinfo = container_of(pnb, struct mtk_charger, pd_nb);
+
+	/* Some TCPC events carry no payload; the union below is only valid
+	 * when data is present. */
+	if (!noti)
+		return NOTIFY_OK;
 
 	pr_notice("PD charger event:%d %d\n", (int)event,
 		(int)noti->pd_state.connected);

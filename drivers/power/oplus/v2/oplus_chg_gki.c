@@ -1105,7 +1105,11 @@ static __init int oplus_chg_gki_init(void)
 	}
 	g_gki_dev = gki_dev;
 
+	/* oplus_chg_core is not under /soc on this board (no /soc node in the
+	 * base dtb); it hangs under /charger. Try both. */
 	node = of_find_node_by_path("/soc/oplus_chg_core");
+	if (node == NULL)
+		node = of_find_node_by_path("/charger/oplus_chg_core");
 	if (node == NULL)
 		gki_dev->smart_charging_screenoff = false;
 	else

@@ -817,13 +817,15 @@ static int oplus_chg_va_set_switch_mode(struct oplus_chg_ic_dev *ic_dev,
 						rc);
 					goto err;
 				}
-				rc = pinctrl_select_state(
-					va->gpio.pinctrl,
-					va->gpio.gpio_switch_ctrl_asic);
-				if (rc < 0) {
-					chg_err("set gpio_switch_ctrl_asic error, rc=%d\n",
-						rc);
-					goto err;
+				if (!IS_ERR_OR_NULL(va->gpio.gpio_switch_ctrl_asic)) {
+					rc = pinctrl_select_state(
+						va->gpio.pinctrl,
+						va->gpio.gpio_switch_ctrl_asic);
+					if (rc < 0) {
+						chg_err("set gpio_switch_ctrl_asic error, rc=%d\n",
+							rc);
+						goto err;
+					}
 				}
 				chg_info("switch to vooc mode\n");
 				break;
@@ -842,11 +844,13 @@ static int oplus_chg_va_set_switch_mode(struct oplus_chg_ic_dev *ic_dev,
 			chg_err("set asic_switch_normal error, rc=%d\n", rc);
 			goto err;
 		}
-		rc = pinctrl_select_state(va->gpio.pinctrl,
-					  va->gpio.gpio_switch_ctrl_ap);
-		if (rc < 0) {
-			chg_err("set gpio_switch_ctrl_ap error, rc=%d\n", rc);
-			goto err;
+		if (!IS_ERR_OR_NULL(va->gpio.gpio_switch_ctrl_ap)) {
+			rc = pinctrl_select_state(va->gpio.pinctrl,
+						  va->gpio.gpio_switch_ctrl_ap);
+			if (rc < 0) {
+				chg_err("set gpio_switch_ctrl_ap error, rc=%d\n", rc);
+				goto err;
+			}
 		}
 		chg_info("switch to normal mode\n");
 		break;
@@ -857,7 +861,9 @@ static int oplus_chg_va_set_switch_mode(struct oplus_chg_ic_dev *ic_dev,
 
 err:
 	pinctrl_select_state(va->gpio.pinctrl, va->gpio.asic_switch_normal);
-	pinctrl_select_state(va->gpio.pinctrl, va->gpio.gpio_switch_ctrl_ap);
+	if (!IS_ERR_OR_NULL(va->gpio.gpio_switch_ctrl_ap))
+		pinctrl_select_state(va->gpio.pinctrl,
+				     va->gpio.gpio_switch_ctrl_ap);
 	mutex_unlock(&va->gpio.pinctrl_mutex);
 	return rc;
 }
@@ -1150,9 +1156,12 @@ static int oplus_va_gpio_init(struct oplus_virtual_asic_ic *chip)
 	asic_gpio->switch_ctrl_gpio =
 		of_get_named_gpio(node, "oplus,switch_ctrl-gpio", 0);
 	if (!gpio_is_valid(asic_gpio->switch_ctrl_gpio)) {
-		chg_err("Couldn't read oplus,switch_ctrl-gpio, %d\n",
-			asic_gpio->switch_ctrl_gpio);
-		return -ENODEV;
+		/* Single-switch board (no ctr1 GPIO in DT): the data-path
+		 * mux does not exist, skip it (switch1 alone sequences). */
+		chg_info("no oplus,switch_ctrl-gpio, single-switch board\n");
+		asic_gpio->gpio_switch_ctrl_ap = NULL;
+		asic_gpio->gpio_switch_ctrl_asic = NULL;
+		goto skip_switch_ctrl;
 	}
 	rc = gpio_request(asic_gpio->switch_ctrl_gpio, "switch_ctrl-gpio");
 	if (rc != 0) {
@@ -1180,6 +1189,7 @@ static int oplus_va_gpio_init(struct oplus_virtual_asic_ic *chip)
 		chg_err("set gpio switch_ctrl_ap error, rc=%d\n", rc);
 		goto free_switch_ctrl_gpio;
 	}
+skip_switch_ctrl:
 
 	asic_gpio->asic_switch1_gpio =
 		of_get_named_gpio(node, "oplus,asic_switch1-gpio", 0);

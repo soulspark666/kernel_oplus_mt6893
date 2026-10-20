@@ -121,7 +121,7 @@ module_param(usbtemp_debug, int, 0644);
 #define TEST_CURRENT_BIT BIT(2)
 MODULE_PARM_DESC(usbtemp_debug, "debug usbtemp");
 
-__maybe_unused static voltage_max_table_mv[OPLUS_CHG_USB_TYPE_MAX] = {
+__maybe_unused static int voltage_max_table_mv[OPLUS_CHG_USB_TYPE_MAX] = {
 	5000,	/* OPLUS_CHG_USB_TYPE_UNKNOWN */
 	5000,	/* OPLUS_CHG_USB_TYPE_SDP */
 	5000,	/* OPLUS_CHG_USB_TYPE_DCP */

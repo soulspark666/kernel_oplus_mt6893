@@ -4061,6 +4061,11 @@ int oplus_vooc_set_config(struct oplus_mms *topic,
 	return 0;
 }
 
+#endif /* CONFIG_OPLUS_CHG_DYNAMIC_CONFIG */
+
+/* NOTE: these callers (mms_wired usbtemp monitor) are unconditional, so the
+ * API shims live outside the DYNAMIC_CONFIG block (4.19 tree does not build
+ * oplus_chg_cfg.c). */
 /*TODO*/
 void oplus_api_switch_normal_chg(struct oplus_mms *topic)
 {
@@ -4097,8 +4102,6 @@ void oplus_api_vooc_turn_off_fastchg(struct oplus_mms *topic)
 	oplus_turn_off_fastchg(chip);
 	return;
 }
-
-#endif /* CONFIG_OPLUS_CHG_DYNAMIC_CONFIG */
 
 static bool oplus_vooc_get_bcc_support(struct oplus_chg_vooc *chip)
 {

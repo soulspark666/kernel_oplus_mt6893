@@ -2507,7 +2507,13 @@ page_owner=on loop.max_part=7";
 		mediatek,spm-mgr;
 		mediatek,usb3-drd;
 		mediatek,noise-still-tr;
+		/* The mtu3 follows the Type-C/BC1.2 extcon for its role, and
+		 * the usb role switch as well. Keep the role switch: it is
+		 * what the extcon driver looks up (usb_role_switch_get()
+		 * matches it by name through the "usb-role-switch" device
+		 * connection) and dropping it made the extcon probe fail. */
 		usb-role-switch;
+		extcon = <&extcon_usb>;
 		status = "okay";
 
 		usb_host: xhci0@11200000 {
@@ -8269,7 +8275,7 @@ page_owner=on loop.max_part=7";
 		adapter_name = "pd_adapter";
 	};
 
-	rt-pd-manager {
+	rt_pd_manager: rt-pd-manager {
 		compatible = "mediatek,rt-pd-manager";
 	};
 
@@ -8880,3 +8886,9 @@ page_owner=on loop.max_part=7";
 #ifdef CONFIG_MTK_ENABLE_GENIEZONE
 #include "mediatek/trusty.dtsi"
 #endif
+
+/* 21127/Cupida v2 charger framework nodes live in the BASE dtb (not the
+ * overlay): the bootloader rejects our repacked dtbo, while the base dtb
+ * ships inside the boot image we control. All &labels resolve at compile
+ * time here, so no overlay fixups are needed. */
+#include "mediatek/cust_mt6893_oplus_charge_21127_v2.dtsi"

@@ -1094,15 +1094,9 @@ void fg_custom_init_from_header(void)
 
 
 #ifdef CONFIG_OF
-#ifndef OPLUS_FEATURE_CHG_BASIC
-static int fg_read_dts_val(const struct device_node *np,
-		const char *node_srting,
-		int *param, int unit)
-#else
 int fg_read_dts_val(const struct device_node *np,
 		const char *node_srting,
 		int *param, int unit)
-#endif
 {
 	static unsigned int val;
 
@@ -2119,13 +2113,9 @@ void sw_check_bat_plugout(void)
 
 			battery_notifier(EVENT_BATTERY_PLUG_OUT);
 
-#ifndef OPLUS_FEATURE_CHG_BASIC
 			battery_main.BAT_STATUS = POWER_SUPPLY_STATUS_UNKNOWN;
 			wakeup_fg_algo(FG_INTR_BAT_PLUGOUT);
 			battery_update(&battery_main);
-#else /* OPLUS_FEATURE_CHG_BASIC */
-			wakeup_fg_algo(FG_INTR_BAT_PLUGOUT);
-#endif /* OPLUS_FEATURE_CHG_BASIC */
 
 			kernel_power_off();
 		}
@@ -2569,19 +2559,15 @@ void fg_bat_temp_int_internal(void)
 
 	if (is_fg_disabled()) {
 
-#ifndef OPLUS_FEATURE_CHG_BASIC
 		battery_main.BAT_batt_temp = 25;
 		battery_update(&battery_main);
-#endif
 
 		return;
 	}
 
 #if defined(CONFIG_MTK_DISABLE_GAUGE) || defined(FIXED_TBAT_25)
 
-#ifndef OPLUS_FEATURE_CHG_BASIC
 	battery_update(&battery_main);
-#endif
 
 	tmp = 1;
 	fg_bat_new_ht = 1;
@@ -2622,9 +2608,7 @@ void fg_bat_temp_int_internal(void)
 		gm.fg_bat_tmp_c_lt,
 		fg_bat_new_lt, fg_bat_new_ht);
 
-#ifndef OPLUS_FEATURE_CHG_BASIC
 	battery_update(&battery_main);
-#endif
 
 #endif
 }
@@ -2688,13 +2672,9 @@ void fg_bat_plugout_int_handler(void)
 
 	if (is_bat_exist == 0) {
 		battery_notifier(EVENT_BATTERY_PLUG_OUT);
-#ifndef OPLUS_FEATURE_CHG_BASIC
 		battery_main.BAT_STATUS = POWER_SUPPLY_STATUS_UNKNOWN;
 		wakeup_fg_algo(FG_INTR_BAT_PLUGOUT);
 		battery_update(&battery_main);
-#else
-		wakeup_fg_algo(FG_INTR_BAT_PLUGOUT);
-#endif /* OPLUS_FEATURE_CHG_BASIC */
 
 		fg_int_event(gm.gdev, EVT_INT_BAT_PLUGOUT);
 		kernel_power_off();
@@ -2968,9 +2948,7 @@ void fg_drv_update_hw_status(void)
 int battery_update_routine(void *x)
 {
 	int ret = 0;
-#ifndef OPLUS_FEATURE_CHG_BASIC
 	battery_update_psd(&battery_main);
-#endif /* OPLUS_FEATURE_CHG_BASIC */
 
 	while (1) {
 		ret = wait_event_interruptible(gm.wait_que,
@@ -3479,13 +3457,11 @@ void bmd_ctrl_cmd_from_user(void *nl_data, struct fgd_nl_msg_t *ret_msg)
 			/* CHR_ERR = -1 */
 			/* CHR_NORMAL = 0 */
 
-#ifndef OPLUS_FEATURE_CHG_BASIC
 			if (battery_main.BAT_STATUS ==
 				POWER_SUPPLY_STATUS_NOT_CHARGING)
 				charger_status = -1;
 			else
 				charger_status = 0;
-#endif /* OPLUS_FEATURE_CHG_BASIC */
 			ret_msg->fgd_data_len += sizeof(charger_status);
 			memcpy(ret_msg->fgd_data,
 				&charger_status, sizeof(charger_status));
@@ -3517,18 +3493,10 @@ void bmd_ctrl_cmd_from_user(void *nl_data, struct fgd_nl_msg_t *ret_msg)
 #if defined(CONFIG_MACH_MT6877) || defined(CONFIG_MACH_MT6885) || defined(CONFIG_MACH_MT6853) \
 	|| defined(CONFIG_MACH_MT6893) || defined(CONFIG_MACH_MT6873)                         \
 	|| defined(CONFIG_MACH_MT6771) || defined(CONFIG_MACH_MT6785)
-#ifndef OPLUS_FEATURE_CHG_BASIC
 			if (battery_main.BAT_STATUS == POWER_SUPPLY_STATUS_CHARGING)
 				is_charger_exist = true;
 			else
 				is_charger_exist = false;
-#else
-			if (upmu_get_rgs_chrdet() == 0 ||
-				mt_usb_is_device() == 0)
-				is_charger_exist = false;
-			else
-				is_charger_exist = true;
-#endif
 #else
 			if (upmu_get_rgs_chrdet() == 0 ||
 				mt_usb_is_device() == 0)
@@ -3778,9 +3746,7 @@ void bmd_ctrl_cmd_from_user(void *nl_data, struct fgd_nl_msg_t *ret_msg)
 		int voltage = 0;
 
 
-#ifndef OPLUS_FEATURE_CHG_BASIC
 		battery_main.BAT_batt_temp = force_get_tbat(true);
-#endif /* OPLUS_FEATURE_CHG_BASIC */
 		voltage = gauge_get_hwocv();
 		gm.hw_status.hw_ocv = voltage;
 
@@ -4521,19 +4487,15 @@ void bmd_ctrl_cmd_from_user(void *nl_data, struct fgd_nl_msg_t *ret_msg)
 				gm.disableGM30, old_uisoc, diff.tv_sec);
 			gm.uisoc_oldtime = now_time;
 
-#ifndef OPLUS_FEATURE_CHG_BASIC
 			battery_main.BAT_CAPACITY = gm.ui_soc;
 			battery_update(&battery_main);
-#endif /* OPLUS_FEATURE_CHG_BASIC */
 
 		} else {
 			bm_debug("[fg_res] FG_DAEMON_CMD_SET_KERNEL_UISOC = %d %d GM3:%d\n",
 				daemon_ui_soc, gm.ui_soc, gm.disableGM30);
 			/* ac_update(&ac_main); */
-#ifndef OPLUS_FEATURE_CHG_BASIC
 			battery_main.BAT_CAPACITY = gm.ui_soc;
 			battery_update(&battery_main);
-#endif /* OPLUS_FEATURE_CHG_BASIC */
 		}
 	}
 	break;
@@ -5107,15 +5069,11 @@ void gm3_log_dump(bool force)
 	/* CHR_ERR = -1 */
 	/* CHR_NORMAL = 0 */
 
-#ifndef OPLUS_FEATURE_CHG_BASIC
 	if (battery_main.BAT_STATUS ==
 		POWER_SUPPLY_STATUS_NOT_CHARGING)
 		gm.log.chr_status = -1;
 	else
 		gm.log.chr_status = 0;
-#else
-    gm.log.chr_status = 0;
-#endif/*OPLUS_FEATURE_CHG_BASIC*/
 
 
 	car = gauge_get_coulomb();

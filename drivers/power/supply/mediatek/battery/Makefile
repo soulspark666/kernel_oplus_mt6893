@@ -22,4 +22,7 @@ subdir-ccflags-y += -Werror -I$(srctree)/drivers/power/supply/mediatek/misc
 
 ifeq ($(CONFIG_MTK_GAUGE_VERSION),30)
 	obj-y += mtk_battery.o mtk_power_misc.o mtk_gauge_coulomb_service.o mtk_gauge_class.o mtk_battery_recovery.o mtk_battery_core.o
+# NOTE: do NOT add -DOPLUS_FEATURE_CHG_BASIC here. mtk_battery.c gates
+# power_supply_register() behind #ifndef OPLUS_FEATURE_CHG_BASIC, so defining
+# it removes the 'battery' power_supply entirely (probe still logs Success).
 endif

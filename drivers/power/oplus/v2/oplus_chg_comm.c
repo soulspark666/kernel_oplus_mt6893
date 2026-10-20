@@ -14,7 +14,14 @@
 #include <linux/reboot.h>
 #include <linux/notifier.h>
 #include <linux/fb.h>
+#ifdef CONFIG_OPLUS_CHARGER_MTK
+/* NOTE: <soc/oplus/system/boot_mode.h> omitted here for the same
+ * get_boot_mode declaration conflict as in oplus_chg_core.c; the MTK
+ * header below provides the declaration and all constants used. */
+#include <mt-plat/mtk_boot_common.h>
+#else
 #include <soc/oplus/system/boot_mode.h>
+#endif
 #if IS_ENABLED(CONFIG_DRM_MSM) || IS_ENABLED(CONFIG_DRM_OPLUS_NOTIFY)
 #include <linux/msm_drm_notify.h>
 #endif
@@ -25,9 +32,6 @@
 #if IS_ENABLED(CONFIG_OPLUS_MTK_DRM_GKI_NOTIFY)
 #include <linux/mtk_panel_ext.h>
 #include <linux/mtk_disp_notify.h>
-#endif
-#ifdef CONFIG_OPLUS_CHARGER_MTK
-#include <mt-plat/mtk_boot_common.h>
 #endif
 #include <soc/oplus/system/oplus_project.h>
 #include <oplus_chg_module.h>
@@ -284,9 +288,8 @@ static const char * const POWER_SUPPLY_CHARGE_TYPE_TEXT[] = {
 	[POWER_SUPPLY_CHARGE_TYPE_NONE]		= "N/A",
 	[POWER_SUPPLY_CHARGE_TYPE_TRICKLE]	= "Trickle",
 	[POWER_SUPPLY_CHARGE_TYPE_FAST]		= "Fast",
-	[POWER_SUPPLY_CHARGE_TYPE_STANDARD]	= "Standard",
-	[POWER_SUPPLY_CHARGE_TYPE_ADAPTIVE]	= "Adaptive",
-	[POWER_SUPPLY_CHARGE_TYPE_CUSTOM]	= "Custom",
+	/* NOTE: STANDARD/ADAPTIVE/CUSTOM do not exist in this tree's
+	 * enum power_supply_charge_type (nor upstream); dropped. */
 };
 
 static const char *const POWER_SUPPLY_HEALTH_TEXT[] = {
@@ -300,7 +303,8 @@ static const char *const POWER_SUPPLY_HEALTH_TEXT[] = {
 	[POWER_SUPPLY_HEALTH_WATCHDOG_TIMER_EXPIRE] = "Watchdog timer expire",
 	[POWER_SUPPLY_HEALTH_SAFETY_TIMER_EXPIRE]   = "Safety timer expire",
 	[POWER_SUPPLY_HEALTH_OVERCURRENT]	    = "Over current",
-	[POWER_SUPPLY_HEALTH_CALIBRATION_REQUIRED]  = "Calibration required",
+	/* NOTE: CALIBRATION_REQUIRED does not exist in this tree's
+	 * enum power_supply_health (nor upstream); dropped. */
 	[POWER_SUPPLY_HEALTH_WARM]		    = "Warm",
 	[POWER_SUPPLY_HEALTH_COOL]		    = "Cool",
 	[POWER_SUPPLY_HEALTH_HOT]		    = "Hot",

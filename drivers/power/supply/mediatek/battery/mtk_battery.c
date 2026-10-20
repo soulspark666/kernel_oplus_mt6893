@@ -202,7 +202,7 @@ static int battery_in_data[1] = { 0 };
 static int battery_out_data[1] = { 0 };
 static bool g_ADC_Cali;
 
-#ifndef OPLUS_FEATURE_CHG_BASIC
+/* battery_data initialization */
 static enum power_supply_property battery_props[] = {
 	POWER_SUPPLY_PROP_STATUS,
 	POWER_SUPPLY_PROP_HEALTH,
@@ -219,8 +219,11 @@ static enum power_supply_property battery_props[] = {
 	POWER_SUPPLY_PROP_CAPACITY_LEVEL,
 	POWER_SUPPLY_PROP_TIME_TO_FULL_NOW,
 	POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
+	/* Without this the battery supply never advertises ONLINE, so every
+	 * framework consumer that keys the charging indicator off
+	 * "supply present AND online" saw nothing. */
+	POWER_SUPPLY_PROP_ONLINE,
 };
-#endif /* OPLUS_FEATURE_CHG_BASIC */
 
 /* boot mode */
 struct tag_bootmode {
@@ -545,7 +548,6 @@ void battery_update_psd(struct battery_data *bat_data)
 	bat_data->BAT_batt_temp = battery_get_bat_temperature();
 }
 
-#ifndef OPLUS_FEATURE_CHG_BASIC
 static int battery_get_property(struct power_supply *psy,
 	enum power_supply_property psp,
 	union power_supply_propval *val)
@@ -560,6 +562,14 @@ static int battery_get_property(struct power_supply *psy,
 	switch (psp) {
 	case POWER_SUPPLY_PROP_STATUS:
 		val->intval = data->BAT_STATUS;
+		break;
+	case POWER_SUPPLY_PROP_ONLINE:
+		/* An external supply is attached whenever we are not actively
+		 * discharging: CHARGING / NOT_CHARGING (paused, e.g. thermal)
+		 * and FULL all mean a charger is present. */
+		val->intval = (data->BAT_STATUS == POWER_SUPPLY_STATUS_CHARGING ||
+			data->BAT_STATUS == POWER_SUPPLY_STATUS_NOT_CHARGING ||
+			data->BAT_STATUS == POWER_SUPPLY_STATUS_FULL) ? 1 : 0;
 		break;
 	case POWER_SUPPLY_PROP_HEALTH:
 		val->intval = data->BAT_HEALTH;/* do not change before*/
@@ -702,7 +712,6 @@ void evb_battery_init(void)
 	battery_main.BAT_batt_vol = 4200;
 	battery_main.BAT_batt_temp = 22;
 }
-#endif /* OPLUS_FEATURE_CHG_BASIC */
 static void disable_fg(void)
 {
 
@@ -738,9 +747,7 @@ static void disable_fg(void)
 	gauge_enable_interrupt(FG_RG_INT_EN_BAT2_L, 0);
 	gm.disableGM30 = 1;
 	gm.ui_soc = 50;
-#ifndef OPLUS_FEATURE_CHG_BASIC
 	battery_main.BAT_CAPACITY = 50;
-#endif
 }
 
 bool fg_interrupt_check(void)
@@ -751,7 +758,6 @@ bool fg_interrupt_check(void)
 	}
 	return true;
 }
-#ifndef OPLUS_FEATURE_CHG_BASIC
 void battery_update(struct battery_data *bat_data)
 {
 	struct power_supply *bat_psy = bat_data->psy;
@@ -770,7 +776,6 @@ void battery_update(struct battery_data *bat_data)
 
 	power_supply_changed(bat_psy);
 }
-#endif /* OPLUS_FEATURE_CHG_BASIC */
 
 bool is_kernel_power_off_charging(void)
 {
@@ -1429,11 +1434,9 @@ static ssize_t show_Battery_Temperature(
 	struct device *dev, struct device_attribute *attr,
 					       char *buf)
 {
-#ifndef OPLUS_FEATURE_CHG_BASIC
 	bm_err("%s: %d %d\n",
 		__func__,
 		battery_main.BAT_batt_temp, gm.fixed_bat_tmp);
-#endif /* OPLUS_FEATURE_CHG_BASIC */
 
 	return sprintf(buf, "%d\n", gm.fixed_bat_tmp);
 }
@@ -1465,14 +1468,12 @@ static ssize_t store_Battery_Temperature(
 			wakeup_fg_algo(FG_INTR_BAT_TMP_C_HT);
 			wakeup_fg_algo(FG_INTR_BAT_TMP_HT);
 		}
-#ifndef OPLUS_FEATURE_CHG_BASIC
 		battery_main.BAT_batt_temp = force_get_tbat(true);
 		bm_err(
 			"%s: fixed_bat_tmp:%d ,tmp:%d!\n",
 			__func__,
 			temp, battery_main.BAT_batt_temp);
 		battery_update(&battery_main);
-#endif /* OPLUS_FEATURE_CHG_BASIC */
 	} else {
 		bm_err("%s: format error!\n", __func__);
 	}
@@ -1506,9 +1507,7 @@ static ssize_t store_UI_SOC(
 			__func__,
 			gm.ui_soc, gm.fixed_uisoc);
 
-#ifndef OPLUS_FEATURE_CHG_BASIC
 		battery_update(&battery_main);
-#endif /* OPLUS_FEATURE_CHG_BASIC */
 	}
 
 	return size;
@@ -1998,13 +1997,11 @@ int force_get_tbat_internal(bool update)
 #ifdef CONFIG_MTK_BIF_SUPPORT
 		/*	CHARGING_CMD_GET_BIF_TBAT need fix */
 #endif
-#ifndef OPLUS_FEATURE_CHG_BASIC
 		bm_notice("[force_get_tbat] %d,%d,%d,%d,%d,%d r:%d %d %d\n",
 		bat_temperature_volt_temp, bat_temperature_volt,
 		fg_current_state, fg_current_temp,
 		fg_r_value, bat_temperature_val,
 		fg_meter_res_value, fg_r_value, gm.no_bat_temp_compensate);
-#endif
 
 		if (pre_bat_temperature_val2 == 0) {
 			pre_bat_temperature_volt_temp =
@@ -2023,7 +2020,6 @@ int force_get_tbat_internal(bool update)
 				(abs(pre_bat_temperature_val2 -
 				bat_temperature_val) >= 50)) ||
 				bat_temperature_val >= 580) {
-#ifndef OPLUS_FEATURE_CHG_BASIC
 				bm_err(
 				"[force_get_tbat][err] current:%d,%d,%d,%d,%d,%d pre:%d,%d,%d,%d,%d,%d\n",
 					bat_temperature_volt_temp,
@@ -2041,7 +2037,6 @@ int force_get_tbat_internal(bool update)
 				/*pmic_auxadc_debug(1);*/
 
 				WARN_ON_ONCE(1);
-#endif
 			}
 
 			pre_bat_temperature_volt_temp =
@@ -2113,12 +2108,10 @@ int force_get_tbat(bool update)
 	bat_temperature_val = force_get_tbat_internal(update);
 
 	while (counts < 5 && bat_temperature_val >= 60) {
-#ifndef OPLUS_FEATURE_CHG_BASIC
 			bm_err("[%s]over60 count=%d, bat_temp=%d\n",
 				__func__,
 				counts, bat_temperature_val);
 
-#endif
 		bat_temperature_val = force_get_tbat_internal(true);
 		counts++;
 	}
@@ -2129,11 +2122,9 @@ int force_get_tbat(bool update)
 			"battery temperature is too low %d and disable GM3.0\n",
 			bat_temperature_val);
 		disable_fg();
-#ifndef OPLUS_FEATURE_CHG_BASIC
 		if (gm.disableGM30 == true)
 			battery_main.BAT_CAPACITY = 50;
 		battery_update(&battery_main);
-#endif /* OPLUS_FEATURE_CHG_BASIC */
 	}
 
 	if (bat_temperature_val <= BATTERY_TMP_TO_DISABLE_NAFG) {
@@ -2152,11 +2143,7 @@ int force_get_tbat(bool update)
 			DEFAULT_BATTERY_TMP_WHEN_DISABLE_NAFG);
 
 		gm.tbat_precise = DEFAULT_BATTERY_TMP_WHEN_DISABLE_NAFG * 10;
-#ifndef OPLUS_FEATURE_CHG_BASIC
 		return DEFAULT_BATTERY_TMP_WHEN_DISABLE_NAFG;
-#else
-		return bat_temperature_val;
-#endif
 	}
 
 	gm.ntc_disable_nafg = false;
@@ -2455,11 +2442,7 @@ int wakeup_fg_algo_atomic(unsigned int flow_state)
 
 int fg_get_battery_temperature_for_zcv(void)
 {
-#ifndef OPLUS_FEATURE_CHG_BASIC
 	return battery_main.BAT_batt_temp;
-#else
-	return DEFAULT_BATT_TEMP;
-#endif /* OPLUS_FEATURE_CHG_BASIC */
 }
 
 int battery_get_charger_zcv(void)
@@ -3707,11 +3690,9 @@ static ssize_t store_FG_daemon_disable(
 {
 	bm_err("[disable FG daemon]\n");
 	disable_fg();
-#ifndef OPLUS_FEATURE_CHG_BASIC
 	if (gm.disableGM30 == true)
 		battery_main.BAT_CAPACITY = 50;
 	battery_update(&battery_main);
-#endif /* OPLUS_FEATURE_CHG_BASIC */
 	return size;
 }
 static DEVICE_ATTR(
@@ -4354,39 +4335,31 @@ static int battery_callback(
 		{
 /* START CHARGING */
 			fg_sw_bat_cycle_accu();
-#ifndef OPLUS_FEATURE_CHG_BASIC
 			battery_main.BAT_STATUS = POWER_SUPPLY_STATUS_CHARGING;
 			battery_update(&battery_main);
-#endif /* OPLUS_FEATURE_CHG_BASIC */
 		}
 		break;
 	case CHARGER_NOTIFY_STOP_CHARGING:
 		{
 /* STOP CHARGING */
 			fg_sw_bat_cycle_accu();
-#ifndef OPLUS_FEATURE_CHG_BASIC
 			battery_main.BAT_STATUS =
 			POWER_SUPPLY_STATUS_DISCHARGING;
 			battery_update(&battery_main);
-#endif /* OPLUS_FEATURE_CHG_BASIC */
 		}
 		break;
 	case CHARGER_NOTIFY_ERROR:
 		{
 /* charging enter error state */
-#ifndef OPLUS_FEATURE_CHG_BASIC
 		battery_main.BAT_STATUS = POWER_SUPPLY_STATUS_NOT_CHARGING;
 		battery_update(&battery_main);
-#endif /* OPLUS_FEATURE_CHG_BASIC */
 		}
 		break;
 	case CHARGER_NOTIFY_NORMAL:
 		{
 /* charging leave error state */
-#ifndef OPLUS_FEATURE_CHG_BASIC
 		battery_main.BAT_STATUS = POWER_SUPPLY_STATUS_CHARGING;
 		battery_update(&battery_main);
-#endif /* OPLUS_FEATURE_CHG_BASIC */
 		}
 		break;
 
@@ -5572,7 +5545,12 @@ static int __init battery_probe(struct platform_device *dev)
 
 	/* Power supply class */
 #if !defined(CONFIG_MTK_DISABLE_GAUGE)
-#ifndef OPLUS_FEATURE_CHG_BASIC
+	/* NOTE: the stock #ifndef OPLUS_FEATURE_CHG_BASIC here removed the
+	 * 'battery' power_supply entirely on this tree (the macro is defined
+	 * globally by the top Makefile), yet the Success print below is
+	 * unconditional — so every consumer that does power_supply_get_by_name
+	 * ("battery") (v1 oplus_charger, v2 gki/mms/hal) got NULL forever.
+	 * Register unconditionally. */
 	battery_main.psy =
 		power_supply_register(
 			&(dev->dev), &battery_main.psd, NULL);
@@ -5581,7 +5559,6 @@ static int __init battery_probe(struct platform_device *dev)
 		ret = PTR_ERR(battery_main.psy);
 		return ret;
 	}
-#endif /* OPLUS_FEATURE_CHG_BASIC */
 	bm_err("[BAT_probe] power_supply_register Battery Success !!\n");
 #endif
 #ifdef OPLUS_FEATURE_CHG_BASIC
